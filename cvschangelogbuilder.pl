@@ -1364,10 +1364,10 @@ writeoutputfile <<EOF;
 <table class="aws_data parameters" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
 
-writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
-writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS root used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
-writeoutputfile "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
-writeoutputfile "<tr><td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>Project&nbsp;module&nbsp;name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS&nbsp;root&nbsp;used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" colspan=2>Range&nbsp;analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
 
 writeoutputfile <<EOF;
 </table></td></tr></table>
