@@ -39,6 +39,9 @@ my $filedate='';
 my $fileauthor='';
 my $filestate='';
 my $filechange='';
+my $filelineadd=0;
+my $filelinedel=0;
+my $filelinechange=0;
 my $filelog='';
 my $oldfiledayauthor='';
 my $oldfilelog='';
@@ -48,6 +51,10 @@ my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs";
+# ---------- Init Regex --------
+use vars qw/ $regclean1 $regclean2 /;
+$regclean1=qr/<(recnb|\/td)>/i;
+$regclean2=qr/<\/?[^<>]+>/i;
 # ---------- Init hash arrays --------
 # For all
 my %maxincludedver=();
@@ -68,8 +75,14 @@ my %LogChange=();
 my %LogChangeDate=();
 my %LogChangeAuthor=();
 my %LogChangeState=();
-
-
+# For output by author
+my %AuthorChangeCommit=();
+my %AuthorChangeLast=();
+my %AuthorChangeLineAdd=();
+my %AuthorChangeLineDel=();
+my %AuthorChangeLineChange=();
+# For html report output
+my $MAXLASTLOG=0;
 
 
 #-------------------------------------------------------
@@ -98,6 +111,18 @@ sub debug {
 }
 
 #-------------------------------------------------------
+# Write
+#-------------------------------------------------------
+sub writeoutput {
+    my $string=shift;
+    my $screenonly=shift;
+    if ($Output !~ /buildhtmlreport$/ || ! $screenonly) { print $string; }
+    debug($string);
+	0;
+}
+
+
+#-------------------------------------------------------
 # LoadDataInMemory
 # Add entries in Hash arrays
 #-------------------------------------------------------
@@ -113,7 +138,7 @@ sub LoadDataInMemory {
 
 	# DEFINE CHANGE STATUS (removed, changed or added) OF FILE
 	my $newfilestate='';
-	if ($Output =~ /^listdelta/) {
+	if ($Output =~ /^listdelta/ || $Output =~ /^buildhtmlreport/) {
 		if ($Branch) {
 			# We want a delta in a secondary BRANCH: Change status can't be defined
 			if (!$filesym{$filename}{$Branch}) { return; }		# This entry is not in branch 
@@ -138,7 +163,7 @@ sub LoadDataInMemory {
 			else {
 				# File did not exist at the beginning
 				if (! $TagEnd || $filesym{$filename}{$TagEnd}) {		# File was added after TagStart (and before TagEnd)
-					# If file contains Attic, this means it was deleted so, as it didn't exists in start tag version,
+					# If file contains Attic, this means it was removed so, as it didn't exists in start tag version,
 					# this means we can ignore this file.
 					if ($filename =~ /[\\\/]Attic([\\\/][^\\\/]+)/) { return; }
 					if ($filestate !~ /dead/) {
@@ -160,10 +185,12 @@ sub LoadDataInMemory {
 			}
 		}
 	}
-	debug(">> File revision $newfilename $fileversion $filedate $fileauthor $filestate $filechange is action '$newfilestate'",3);
+	
+	# All infos were found. We can process record
+	debug(">>>> File revision $newfilename - $fileversion - $filedate - $fileauthor - $filestate - $filelineadd - $filelinedel - $filelinechange - $filechange is action '$newfilestate'",2);
 	
 	# For output by date
-	if ($Output =~ /bydate/ || $Output =~ /forrpm/) {
+	if ($Output =~ /bydate/ || $Output =~ /forrpm/ || $Output =~ /buildhtmlreport/) {
 		my $fileday=$filedate; $fileday =~ s/\s.*//g;
 		$DateAuthorChange{"$fileday $fileauthor"}=1;
 		$DateAuthorLogChange{"$fileday $fileauthor"}{$newfilelog}=1;
@@ -176,7 +203,7 @@ sub LoadDataInMemory {
 				$fileversionnext =~ s/\.(\d+)$/\.$newver/;
 			}
 			if ($DateAuthorLogFileRevChange{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"} =~ /^changed$/) {
-				debug("Correct next version of $newfilename $fileversionnext ($fileversionnext should be 'added_forced' instead of 'changed')",2);
+				debug("Correct next version of $newfilename $fileversionnext ($fileversionnext should be 'added_forced' instead of 'changed')",3);
 				$DateAuthorLogFileRevChange{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"}="added_forced";
 			}
 		}
@@ -189,7 +216,7 @@ sub LoadDataInMemory {
 				$fileversionnext =~ s/\.(\d+)$/\.$newver/;
 			}
 			if ($DateAuthorLogFileRevChange{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"} =~ /^(removed|changed_forced)$/) {
-				debug("Correct version of $newfilename $fileversion ($fileversion should be 'changed_forced' instead of 'removed')",2);
+				debug("Correct version of $newfilename $fileversion ($fileversion should be 'changed_forced' instead of 'removed')",3);
 				$DateAuthorLogFileRevChange{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $fileversion"}='changed_forced';	# with _forced to not be change again by previous test
 			}
 		}
@@ -199,7 +226,7 @@ sub LoadDataInMemory {
 	}
 	
 	# For output by file
-	if ($Output =~ /byfile/) {
+	if ($Output =~ /byfile/ || $Output =~ /buildhtmlreport/) {
 		if (! $FilesLastVersion{$newfilename}) { $FilesLastVersion{$newfilename}=$fileversion; }	# Save 'last' file version
 		$FilesChangeDate{$newfilename}{$fileversion}=$filedate;
 		$FilesChangeAuthor{$newfilename}{$fileversion}=$fileauthor;
@@ -208,12 +235,34 @@ sub LoadDataInMemory {
 	}
 	
 	# For output by log
-	if ($Output =~ /bylog/) {
+	if ($Output =~ /bylog/ || $Output =~ /buildhtmlreport/) {
 		$LogChange{$newfilelog}=1;
 		$LogChangeDate{$newfilelog}{"$newfilename $fileversion"}=$filedate;
 		$LogChangeAuthor{$newfilelog}{"$newfilename $fileversion"}=$fileauthor;
 		$LogChangeState{$newfilelog}{"$newfilename $fileversion"}=$newfilestate;
 	}
+	
+	if ($Output =~ /^buildhtmlreport/) {
+	    if (! $AuthorChangeLast{$fileauthor} || $AuthorChangeLast{$fileauthor} < $filedate) { $AuthorChangeLast{$fileauthor}=$filedate; }
+	    $AuthorChangeCommit{$fileauthor}{$filename}++;
+	    $AuthorChangeLineAdd{$fileauthor}+=$filelineadd;
+	    $AuthorChangeLineDel{$fileauthor}+=$filelinedel;
+	    $AuthorChangeLineChange{$fileauthor}+=$filelinechange;
+	}
+}
+
+#------------------------------------------------------------------------------
+# Function:     Clean tags in a string
+# Parameters:   stringtodecode
+# Input:        None
+# Output:       None
+# Return:		decodedstring
+#------------------------------------------------------------------------------
+sub CleanFromTags {
+	my $stringtoclean=shift;
+	$stringtoclean =~ s/$regclean1/ /g;	# Replace <recnb> or </td> with space
+	$stringtoclean =~ s/$regclean2//g;	# Remove <xxx>
+	return $stringtoclean;
 }
 
 #------------------------------------------------------------------------------
@@ -222,6 +271,7 @@ sub LoadDataInMemory {
 #                Option "" or "rpm"
 # Return:        string "YYYY-MM-DD HH:MM:SS xxx" if option is ""
 #                String "Thu Mar 7 2002 xxx" if option is "rpm"
+#                String "YYYY-MM-DD HH:MM" if option is "simple"
 #------------------------------------------------------------------------------
 sub FormatDate {
 	my $string=shift;
@@ -232,7 +282,55 @@ sub FormatDate {
 		my $ctime=localtime($ns); $ctime =~ s/ 00:00:00//;
 		$string =~ s/(\d\d\d\d)-(\d\d)-(\d\d)/$ctime/;
 	}
+	if ($option eq 'simple' && $string =~ /(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d)/) {
+        $string="$1-$2-$3 $4:$5";
+	}
 	return "$string";
+}
+
+#------------------------------------------------------------------------------
+# Function:      Format a state string with color
+#------------------------------------------------------------------------------
+sub FormatState {
+	my $string=shift;
+	my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
+    return "<font color=\"".$colorstate{$string}."\">$string</font>";
+}
+
+#------------------------------------------------------------------------------
+# Function:      Format a diff link
+#------------------------------------------------------------------------------
+sub FormatDiffLink {
+	my $url=shift;
+	my $version=shift;
+    my $string='';
+    my $viewcvs="http://savannah.nongnu.org/cgi-bin/viewcvs/dolibarr/dolibarr/";
+    $string="$viewcvs";
+    $string.="$url";
+    if (CompareVersionBis($version,"1.1")>0) {
+        $string.=".diff?r1=";
+        $string.="&r2=".$version;
+    }
+    else {
+        $string.="?rev=".$version;
+    }    
+	return "<a href=\"$string\">$url</a>";
+}
+
+#------------------------------------------------------------------------------
+# Function:      Format a number
+# Input:         number precision
+# Return:        dd.d
+#                String "Thu Mar 7 2002 xxx" if option is "rpm"
+#                String "YYYY-MM-DD HH:MM" if option is "simple"
+#------------------------------------------------------------------------------
+sub RoundNumber {
+	my $number=shift;
+	my $precision=shift;
+    foreach (1..$precision) { $number*=10; }
+    $number=int($number);
+    foreach (1..$precision) { $number/=10; }
+	return "$number";
 }
 
 #------------------------------------------------------------------------------
@@ -306,57 +404,66 @@ if (! $ENV{"SERVER_NAME"}) {
 }
 
 if ($Output) {
-	if ($Output ne "listdeltabydate" && $Output ne "listdeltabylog" && $Output ne "listdeltabyfile" && $Output ne "listdeltaforrpm") {
-		print "----- $PROG $VERSION (c) Laurent Destailleur -----\n";
-		print "Unknown value for output parameter.\n";
+	my %allowedvalueforoutput=(
+	"listdeltabydate"=>1,
+	"listdeltabylog"=>1,
+	"listdeltabyfile"=>1,
+	"listdeltaforrpm"=>1,
+	"buildhtmlreport"=>1
+	);
+	if (! $allowedvalueforoutput{$Output}) {
+		writeoutput("----- $PROG $VERSION (c) Laurent Destailleur -----\n");
+		writeoutput("Unknown value for output parameter.\n");
 		exit 1;
 	}
 }
 
 if ($Help || ! $Output) {
-	print "----- $PROG $VERSION (c) Laurent Destailleur -----\n";
-	print "$PROG generates advanced ChangeLog files for CVS projects/modules.\n";
-	print "Note 1: Your cvs client (cvs or cvs.exe) must be in your PATH.\n";
-	print "Note 2: To use cvs client through ssh, add option -ssh.\n";
-	print "\nUsage:\n";
-	print "  $PROG.$Extension -output=outputmode [-m=module -d=repository] [options]\n";
-	print "\n";
-	print "Where 'outputmode' is:\n";
-	print "  listdeltabydate  To get a changelog between 2 versions, sorted by date\n";
-	print "  listdeltabylog   To get a changelog between 2 versions, sorted by log\n";
-	print "  listdeltabyfile  To get a changelog between 2 versions, sorted by file\n";
-	print "  listdeltaforrpm  To get a changelog between 2 versions for rpm spec files\n";
-	print "\n";
-	print "  Note that \"between 2 versions\" means (depending on tagstart/tagend usage):\n";
-	print "  * from start to a tagged version (version changes included)\n";
-	print "  * from a start version (excluded) to another tagged version (included)\n";
-	print "  * or from a tagged version until now (version changes excluded)\n";
-	print "\n";
-	print "The 'module' and 'repository' are the CVS module name and the CVS repository.\n";
-	print "  If current directory is the root of a CVS project built from a cvs checkout,\n";
-	print "  cvschangelogbuilder will retreive module and repository value automatically.\n";
-	print "  If no local copy of repository are available or to force other values, use:\n";
-	print "  -m=module           To force value of module name\n";
-	print "  -d=repository       To force value of CVSROOT\n";
-	print "\n";
-	print "Options are:\n";
-	print "  -branch=branchname  To work on another branch than default branch (!)\n";
-	print "  -tagstart=tagname   To specify start tag version\n";
-	print "  -tagend=tagend      To specify end tag version\n";
-	print "\n";
-	print "  WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n";
-	print "  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n";
-	print "  give the name of the branch, otherwise you will get unpredicable result.\n";
-	print "\n";
-	print "  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n";
-	print "  -debug=x            To get debug info with level x\n";
-	print "  -rlogfile=rlogfile  To build changelog from an already existing rlog file\n";
-	print "\n";
-	print "Example:\n";
-	print "  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n";
-	print "  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n";
-	print "  $PROG.$Extension -module=mymodule  -output=listdeltabylog  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n";
-	print "\n";
+	writeoutput("----- $PROG $VERSION (c) Laurent Destailleur -----\n");
+	writeoutput("$PROG generates advanced ChangeLog/Report files for CVS projects/modules.\n");
+	writeoutput("Note 1: Your cvs client (cvs or cvs.exe) must be in your PATH.\n");
+	writeoutput("Note 2: To use $PROG with a csv client through ssh, add option -ssh.\n");
+	writeoutput("\nUsage:\n");
+	writeoutput("  $PROG.$Extension -output=outputmode [-m=module -d=repository] [options]\n");
+	writeoutput("\n");
+	writeoutput("Where 'outputmode' is:\n");
+	writeoutput("  listdeltabydate  To get a changelog between 2 versions, sorted by date\n");
+	writeoutput("  listdeltabylog   To get a changelog between 2 versions, sorted by log\n");
+	writeoutput("  listdeltabyfile  To get a changelog between 2 versions, sorted by file\n");
+	writeoutput("  listdeltaforrpm  To get a changelog between 2 versions for rpm spec files\n");
+	writeoutput("  buildhtmlreport  To build an html report\n");
+	writeoutput("\n");
+	writeoutput("  Note that \"between 2 versions\" means (depends on tagstart/tagend options):\n");
+	writeoutput("  * from start to a tagged version (version changes included)\n");
+	writeoutput("  * from a start version (excluded) to another tagged version (included)\n");
+	writeoutput("  * or from a tagged version until now (version changes excluded)\n");
+	writeoutput("\n");
+	writeoutput("The 'module' and 'repository' are the CVS module name and the CVS repository.\n");
+	writeoutput("  If current directory is the root of a CVS project built from a cvs checkout,\n");
+	writeoutput("  cvschangelogbuilder will retreive module and repository value automatically.\n");
+	writeoutput("  If no local copy of repository are available or to force other value, use:\n");
+	writeoutput("  -m=module           To force value of module name\n");
+	writeoutput("  -d=repository       To force value of CVSROOT\n");
+	writeoutput("\n");
+	writeoutput("Options are:\n");
+	writeoutput("  -branch=branchname  To work on another branch than default branch (!)\n");
+	writeoutput("  -tagstart=tagname   To specify start tag version\n");
+	writeoutput("  -tagend=tagend      To specify end tag version\n");
+	writeoutput("\n");
+	writeoutput("  ! WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n");
+	writeoutput("  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n");
+	writeoutput("  give the name of the branch, otherwise you will get unpredicable result.\n");
+	writeoutput("\n");
+	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
+	writeoutput("  -debug=x            To get debug info with level x\n");
+	writeoutput("  -rlogfile=rlogfile  To build changelog from an already existing rlog file\n");
+	writeoutput("\n");
+	writeoutput("Example:\n");
+	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
+	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n");
+	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabylog  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n");
+	writeoutput("  $PROG.$Extension -module=mymodule  -output=buildhtmlreport -d=:ext:user\@cvs.sourceforge.net:/cvsroot\n");
+	writeoutput("\n");
 	exit 0;
 }
 
@@ -394,10 +501,10 @@ if (! $Module) {
 	}
 }
 if (! $Module) {
-	print "\n";
+	writeoutput("\n");
 	error("The module name was not provided and could not be detected.\nUse -m=cvsmodulename option to specifiy module name.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 }
-print ucfirst($PROG)." launched for module: $Module\n";
+writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
 # Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile)
 if (! $RLogFile) {
@@ -418,19 +525,19 @@ if (! $RLogFile) {
 		if ($ENV{"CVSROOT"}) { $CvsRoot=$ENV{"CVSROOT"}; }
 	}
 	if (! $CvsRoot) {
-		print "\n";
+		writeoutput("\n");
 		error("The repository value to use was not provided and could not be detected.\nUse -d=repository option to specifiy repository value.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 	}
 
 	$ENV{"CVSROOT"}=$CvsRoot;
-	print ucfirst($PROG)." launched for repository: $CvsRoot\n";
+	writeoutput(ucfirst($PROG)." launched for repository: $CvsRoot\n",1);
 
 }
 
 
 # Set use of ssh or not
 if ($UseSsh) {
-	print "Set CVS_RSH=ssh\n";
+	writeoutput("Set CVS_RSH=ssh\n",1);
 	$ENV{'CVS_RSH'}='ssh';
 }
 
@@ -454,8 +561,8 @@ if (! $RLogFile) {
 	else {
 		$command="$CVSCLIENT -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
-	print "Building temporary cvs rlog file '$TmpFile'\n";
-	print "with command '$command'\n";
+	writeoutput("Building temporary cvs rlog file '$TmpFile'\n",1);
+	writeoutput("with command '$command'\n",1);
 	debug("CVSROOT value is '".$ENV{"CVSROOT"}."'");
 	my $result=`$command 2>&1`;
 	print TEMPFILE "$result";
@@ -468,8 +575,7 @@ if (! $RLogFile) {
 
 # ANALYZE RLOGFILE
 #------------------------
-print("Formating output $Output from rlog file '$RLogFile'...\n\n");
-debug("Formating output $Output from rlog file '$RLogFile'...");
+writeoutput("Formating output $Output from rlog file '$RLogFile'...\n\n",1);
 open(RLOGFILE,"<$RLogFile") || error("Can't open rlog file");
 my $waitfor="filename";
 while (<RLOGFILE>) {
@@ -483,12 +589,13 @@ while (<RLOGFILE>) {
 
 	# Wait for a new file
 	if ($waitfor eq "filename") {
+        #if ($line =~ /^cvs rlog: Logging (.*)/) { $Module=$1; } # Set module name from log file
 		if ($line =~ /$EXTRACTFILENAME/i) {
 			$filename=$1;
 			$filename =~ s/,v$//g;					# Clean filename if ended with ",v"
 			# We found a new filename
 			$waitfor="symbolic_name";
-			debug("Found a new file '$filename'");
+			debug("Found a new file '$filename'",2);
 			#filename=ExcludeRepositoryFromPath($filename);
 			$maxincludedver{"$filename"}=0;
 			$minexcludedver{"$filename"}=0;
@@ -501,7 +608,7 @@ while (<RLOGFILE>) {
 		if ($line =~ /$EXTRACTSYMBOLICNAMEAREA/i) {
 			# We found symbolic names area
 			$waitfor="symbolic_name_entry";
-			debug("Found symbolic name area");
+			debug("Found symbolic name area",2);
 		}
 		next;
 	}
@@ -512,14 +619,14 @@ while (<RLOGFILE>) {
 			# We found symbolic name entry
 			# We set symbolic name. Example: $filesym{$filename}{MYAPPLI_1_0}=1.2
 			$filesym{$filename}{$1}=$2;
-			debug("Found symbolic name entry $1 is for version $filesym{$filename}{$1}");
+			debug("Found symbolic name entry $1 is for version $filesym{$filename}{$1}",2);
 			if ($TagEnd && $TagEnd eq $1) {
 				$maxincludedver{"$filename"}=$2;
-				debug(" Max included version for file '$filename' set to $2");
+				debug(" Max included version for file '$filename' set to $2",3);
 			}
 			if ($TagStart && $TagStart eq $1) {
 				$minexcludedver{"$filename"}=$2;
-				debug(" Min excluded version for file '$filename' set to $2");
+				debug(" Min excluded version for file '$filename' set to $2",3);
 			}
 		}
 		else {
@@ -533,15 +640,15 @@ while (<RLOGFILE>) {
 		if ($line =~ /^=====/) {
 			# No revision found
 			$waitfor="filename";
-			debug(" No revision found. Waiting for next $waitfor.");
-			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog='';
+			debug(" No revision found. Waiting for next $waitfor.",2);
+			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /$EXTRACTFILEVERSION/i) {
 			# We found a new revision number
 			$fileversion=$1;
 			$waitfor="dateauthorstate";
-			debug("Found a new revision number $fileversion");
+			debug("Found a new revision number $fileversion",2);
 		}
 		next;
 	}
@@ -551,9 +658,17 @@ while (<RLOGFILE>) {
 		if ($line =~ /$EXTRACTFILEDATEAUTHORSTATE/i) {
 			# We found date/author line
 			$filedate=$1; $fileauthor=$2; $filestate=$3; $filechange=$4;
+			$filechange =~ s/[^\s\d\+\-]+//g;
+			$filelineadd=0; $filelinedel=0; $filelinechange=0;
+			foreach my $key (split(/\s+/,$filechange)) {
+			    if (int($key)>0) { $filelineadd=int($key); }
+			    if (int($key)<0) { $filelinedel=(-int($key)); }
+			}
+		    if ($filelineadd>=$filelinedel) { $filelineadd-=$filelinedel; $filelinechange=$filelinedel; $filelinedel=0; }
+		    else { $filelinedel-=$filelineadd; $filelinechange=$filelineadd; $filelineadd=0; }
 			$filedate =~ s/[\s;]+$//; $fileauthor =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
 			$waitfor="log";
-			debug("Found a new date/author/state $filedate $fileauthor $filestate");
+			debug("Found a new date/author/state/lines $filedate $fileauthor $filestate $filelineadd $filelinedel $filelinechange",2);
 		}
 		next;
 	}
@@ -564,19 +679,19 @@ while (<RLOGFILE>) {
 		if ($line =~ /^-----/) {
 			$waitfor="revision";
 			LoadDataInMemory();
-			debug(" Revision info are stored. Waiting for next $waitfor.");
-			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog='';
+			debug(" Revision info are stored. Waiting for next $waitfor.",2);
+			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /^=====/) {
 			$waitfor="filename";
 			LoadDataInMemory();
-			debug(" Revision info are stored. Waiting for next $waitfor.");
-			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog='';
+			debug(" Revision info are stored. Waiting for next $waitfor.",2);
+			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		# Line is log
-		debug("Found a new line for log $line");
+		debug("Found a new line for log $line",2);
 		$filelog.="$line\n";
 		next;
 	}
@@ -584,19 +699,88 @@ while (<RLOGFILE>) {
 
 # BUILD OUTPUT
 #------------------------
-print "\nChanges for $Module";
+
+# Build header
+my $headstring='';
+my $rangestring='';
+if ($Output !~ /buildhtmlreport$/) {
+    $headstring.="\nChanges for $Module";
+}
+else {
+    $headstring.="\nCVS report for module <b>$Module</b>";
+}
 if ($Branch) {
-	print " in branch $Branch";	
+    $headstring.=" in branch $Branch";
+    $rangestring.="Branch $Branch";
+}
+else {
+    $rangestring.="Main Branch (HEAD)";
 }
 if ($TagStart) {
-	if ($TagEnd) { print " beetween $TagStart and $TagEnd"; }
-	else { print " since $TagStart"; }
+	if ($TagEnd) {
+	    $headstring.=" beetween $TagStart (excluded) and $TagEnd (included)";
+	    $rangestring.= " - Beetween $TagStart (excluded) and $TagEnd (included)"; 
+	}
+	else {
+	    $headstring.=" since $TagStart (excluded)";
+	    $rangestring.= " - Since $TagStart (excluded)";
+	}
 }
 elsif ($TagEnd) {
-	print " with $TagEnd";
+	$headstring.=" in $TagEnd";
+    $rangestring.= " in $TagEnd";
 }
-print "\n built by $PROG $VERSION with option $Output.\n\n";
-
+$headstring.="\n built by $PROG $VERSION with option $Output.";
+if ($Output !~ /buildhtmlreport$/) {
+    print "$headstring\n\n";
+}
+else {
+    print "<html>\n<head>\n";
+    print "<meta name=\"generator\" content=\"$PROG $VERSION\" />\n";
+    print "<meta name=\"robots\" content=\"noindex,nofollow\" />\n";
+    print "<meta http-equiv=\"content-type\" content=\"text/html; charset=iso-8859-1\" />\n";
+    print "<meta http-equiv=\"description\" content=\"$headstring\" />\n";
+    print "<title>CVS report for $Module</title>\n";
+    print <<EOF;
+<style type="text/css">
+<!--
+body { font: 11px verdana, arial, helvetica, sans-serif; background-color: #FFFFFF; margin-top: 0; margin-bottom: 0; }
+.aws_bodyl  { }
+.aws_border { background-color: #FFE0B0; padding: 1px 1px 1px 1px; margin-top: 0; margin-bottom: 0; }
+.aws_title  { font: 13px verdana, arial, helvetica, sans-serif; font-weight: bold; background-color: #FFE0B0; text-align: center; margin-top: 0; margin-bottom: 0; padding: 1px 1px 1px 1px; color: #000000; }
+.aws_blank  { font: 13px verdana, arial, helvetica, sans-serif; background-color: #FFE0B0; text-align: center; margin-bottom: 0; padding: 1px 1px 1px 1px; }
+.aws_data {
+	background-color: #FFFFFF;
+	border-top-width: 1px;   
+	border-left-width: 0px;  
+	border-right-width: 0px; 
+	border-bottom-width: 0px;
+}
+.aws_formfield { font: 13px verdana, arial, helvetica; }
+.aws_button {
+	font-family: arial,verdana,helvetica, sans-serif;
+	font-size: 12px;
+	border: 1px solid #ccd7e0;
+	background-image : url(/icon/other/button.gif);
+}
+th		{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 2px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:center; color: #000000; }
+th.aws	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 2px 1px 1px; font-size: 13px; font-weight: bold; }
+td		{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 1px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:center; color: #000000; }
+td.aws	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 1px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:left; color: #000000; }
+td.awsm	{ border-left-width: 0px; border-right-width: 0px; border-top-width: 0px; border-bottom-width: 0px; padding: 0px 0px 0px 0px; font: 11px verdana, arial, helvetica, sans-serif; text-align:left; color: #000000; }
+b { font-weight: bold; }
+a { font: 11px verdana, arial, helvetica, sans-serif; }
+a:link    { color: #0011BB; text-decoration: none; }
+a:visited { color: #0011BB; text-decoration: none; }
+a:hover   { color: #605040; text-decoration: underline; }
+div { font: 12px 'Arial','Verdana','Helvetica', sans-serif; text-align: justify; }
+.CTooltip { position:absolute; top: 0px; left: 0px; z-index: 2; width: 380px; visibility:hidden; font: 8pt 'MS Comic Sans','Arial',sans-serif; background-color: #FFFFE6; padding: 8px; border: 1px solid black; }
+//-->
+</style>
+EOF
+    print "</head>\n";
+    print "<body>\n";
+}
 
 # For output by date
 if ($Output =~ /bydate$/ || $Output =~ /forrpm$/) {
@@ -694,6 +878,158 @@ if ($Output =~ /bylog$/) {
 	else {
 		print "No change detected.\n";	
 	}
+}
+
+
+# For building html report
+if ($Output =~ /buildhtmlreport$/) {
+
+print <<EOF;
+
+<a name="menu">&nbsp;</a>
+<table border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td>
+<table class="aws_data" border="0" cellpadding="1" cellspacing="0" width="100%">
+<tr><td class="awsm">$headstring</td></tr>
+</table>
+</td></tr></table>
+<br />
+
+<a name="summary">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="400">
+<tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+my %TotalState=('added'=>0,'changed'=>0,'removed'=>0);
+foreach my $dateuser (reverse sort keys %DateAuthorChange) {
+    my ($date,$user)=split(/\s+/,$dateuser);
+	foreach my $logcomment (sort keys %{$DateAuthorLogChange{$dateuser}}) {
+		foreach my $revision (sort keys %{$DateAuthorLogFileRevChange{$dateuser}{$logcomment}}) {
+			my $state=$DateAuthorLogFileRevChange{$dateuser}{$logcomment}{$revision};
+			$state =~ s/_forced//;
+            $TotalState{$state}++;
+        }
+    }
+}
+print "<tr><td class=\"aws\">Project module name</td><td class=\"aws\">$Module</td></tr>";
+print "<tr bgcolor=\"#FFF0E0\"><td class=\"aws\">Range analysis</td><td class=\"aws\">$rangestring</td></tr>";
+print "<tr bgcolor=\"#FFF0E0\"><td class=\"aws\">Date analysis</td><td class=\"aws\">".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</td></tr>";
+print "<tr><td class=\"aws\">Active developers</td><td class=\"aws\">".(scalar keys %AuthorChangeCommit)."</td></tr>";
+print "<tr><td class=\"aws\">Files added</td><td class=\"aws\">$TotalState{'added'}</td></tr>";
+print "<tr><td class=\"aws\">Files changed</td><td class=\"aws\">$TotalState{'changed'}</td></tr>";
+print "<tr><td class=\"aws\">Files removed</td><td class=\"aws\">$TotalState{'removed'}</td></tr>";
+#print "<tr><td class=\"aws\">Total files ".($TagEnd?" in $TagEnd":" now")."</td><td class=\"aws\"></td></tr>";
+print <<EOF;
+</table></td></tr></table><br />
+
+<br />
+
+<a name="linesofcode">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Lines of code</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data month" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+
+<tr><td align="center">
+<center>
+<table>
+<tr valign="bottom"><td>&nbsp;</td>
+EOF
+print "<td>Chart not yet available</td>";
+print <<EOF;
+<td>&nbsp;</td></tr>
+</table>
+</center>
+</td></tr></table></td></tr></table><br />
+
+<br />
+
+<a name="developpers">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Developers</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="#9977AA" width="140">Number of files commited</th><th bgcolor="#8877DD" width="140">Number of commit</th><th bgcolor="#C1B2E2" width="140">Lines<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last change</th><th>&nbsp; </th></tr>
+EOF
+foreach my $key (keys %AuthorChangeCommit) {
+    my $nbcommit=0; my $nbfile=0;
+    foreach my $file (keys %{$AuthorChangeCommit{$key}}) {
+       $nbcommit+=$AuthorChangeCommit{$key}{$file};
+       $nbfile++;
+    }
+
+    print "<tr><td class=\"aws\">";
+    print $key;
+    print "</td><td>";
+    print $nbfile;
+    print "</td><td>";
+    print $nbcommit;
+    print "</td><td>";
+    print $AuthorChangeLineAdd{$key}."/".$AuthorChangeLineChange{$key}."/".$AuthorChangeLineDel{$key};
+    print "</td><td>";
+    print RoundNumber($AuthorChangeLineAdd{$key}/$nbcommit,1)."/".RoundNumber($AuthorChangeLineChange{$key}/$nbcommit,1)."/".RoundNumber($AuthorChangeLineDel{$key}/$nbcommit,1);
+    print "</td><td>";
+    print FormatDate($AuthorChangeLast{$key},'simple');
+    print "</td>";
+    print "<td>&nbsp;</td>";
+    print "</tr>";
+}
+print <<EOF;
+</table></td></tr></table><br />
+
+<br />
+
+<a name="lastlogs">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Last commit logs</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data lastlogs" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+my $width=140;
+print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Authors</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+my $cursor=0;
+foreach my $dateuser (reverse sort keys %DateAuthorChange) {
+    my ($date,$user)=split(/\s+/,$dateuser);
+    print "<tr><td valign=\"top\">".FormatDate($date)."</td>";
+    print "<td valign=\"top\">".$user."</td>";
+    print "<td class=\"aws\">";
+	foreach my $logcomment (sort keys %{$DateAuthorLogChange{$dateuser}}) {
+        $cursor++;
+        my $comment=$logcomment;
+		chomp $comment;
+		$comment =~ s/\r$//;
+		foreach my $logline (split(/\n/,$comment)) {
+			print "<b>".CleanFromTags($logline)."</b><br>\n";
+		}
+		foreach my $revision (reverse sort keys %{$DateAuthorLogFileRevChange{$dateuser}{$logcomment}}) {
+			$revision=~/(.*)\s([\d\.]+)/;
+			my ($file,$version)=($1,$2);
+			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
+			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
+			my $state=$DateAuthorLogFileRevChange{$dateuser}{$logcomment}{$revision};
+			$state =~ s/_forced//;
+			print "* ".FormatDiffLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state).")<br>\n";
+		}
+        if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
+	}
+    if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
+    print "</td></tr>";
+}	
+
+print <<EOF;
+</table></td></tr></table><br />
+EOF
+
+}
+
+# Footer
+if ($Output =~ /buildhtmlreport$/) {
+    print "<br />\n";
+	print "<b><a href=\"http://cvschangelogb.sourceforge.net\" target=\"awstatshome\">Created by $PROG $VERSION</a></b>";
+    print "<br />\n";
+	print "<br />\n";
+	print "</body>\n</html>\n";
 }
 
 0;
