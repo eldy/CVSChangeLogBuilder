@@ -319,6 +319,7 @@ sub LoadDataInMemory {
             }
             else {
                 debug("Nb of line : $nbline",2);
+                $Cache{$relativefilename}{$filerevisiontoscan}=$nbline; 
                 # Save result in a cache for other run
                 print CACHE "$relativefilename $filerevisiontoscan $nbline $fileformat\n";
             }
