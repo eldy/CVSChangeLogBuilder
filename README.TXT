@@ -20,7 +20,7 @@ listdeltabylog		To build a changelog by change comment.
 
 License: GNU GPL (GNU General Public License. See LICENSE file)
 Version : 1.0
-Release date: November 2003
+Release date: December 2003
 Platforms: All (Linux, NT, SCO, BSD, Solaris and other *NIX's, BeOS, OS/2...)
 Author: Laurent Destailleur <eldy@users.sourceforge.net>
 cvschangelogbuilder official web site and latest version: http://cvschangelogbuilder.sourceforge.net
