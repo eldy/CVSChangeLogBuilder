@@ -1,4 +1,4 @@
-<?xml version="1.0" ?>
+<?xml version="1.0" encoding="Windows-1252" ?>
 <XML_DIZ_INFO>
 <MASTER_PAD_VERSION_INFO>
     <MASTER_PAD_VERSION>1.15</MASTER_PAD_VERSION>
@@ -12,7 +12,7 @@
         <State_Province>Yvelines</State_Province>
         <Zip_Postal_Code>78180</Zip_Postal_Code>
         <Country>FRANCE</Country>
-        <Company_WebSite_URL>http://awstats.sourceforge.net</Company_WebSite_URL>
+        <Company_WebSite_URL>http://cvschangelogb.sourceforge.net</Company_WebSite_URL>
 <Contact_Info>
         <Author_First_Name>Laurent</Author_First_Name>
         <Author_Last_Name>Destailleur</Author_Last_Name>
@@ -33,7 +33,7 @@
 </Company_Info>
 <Program_Info>
         <Program_Name>CVSChangeLogBuilder</Program_Name>
-        <Program_Version>1.1</Program_Version>
+        <Program_Version>2.0</Program_Version>
         <Program_Release_Month>09</Program_Release_Month>
         <Program_Release_Day>08</Program_Release_Day>
         <Program_Release_Year>2003</Program_Release_Year>
@@ -46,13 +46,13 @@
         <Program_OS_Support>Win95,Win98,WinME,WinNT 4.x,WinXP,Windows2000,Unix,Linux,OS/2,OS/2 Warp,OS/2 Warp 4,MAC 68k,Mac PPC</Program_OS_Support>
         <Program_Language>English,Spanish,French,German,Italian,Japanese,ChineseSimplified,ChineseTraditional,Russian</Program_Language>
 <File_Info>
-        <Filename_Versioned>cvschangelogbuilder-1.1.tgz</Filename_Versioned>
-        <Filename_Previous>cvschangelogbuilder-1.0.tgz</Filename_Previous>
-        <Filename_Generic>cvschangelogbuilder.tgz</Filename_Generic>
+        <Filename_Versioned>cvschangelogbuilder-20.zip</Filename_Versioned>
+        <Filename_Previous>cvschangelogbuilder-2.0.tgz</Filename_Previous>
+        <Filename_Generic>cvschangelogbuilder-.zip</Filename_Generic>
         <Filename_Long>cvschangelogbuilder.tgz</Filename_Long>
-        <File_Size_Bytes>128271</File_Size_Bytes>
-        <File_Size_K>125</File_Size_K>
-        <File_Size_MB>0.13</File_Size_MB>
+        <File_Size_Bytes>29064</File_Size_Bytes>
+        <File_Size_K>28</File_Size_K>
+        <File_Size_MB>0.03</File_Size_MB>
     </File_Info>
 <Expire_Info>
         <Has_Expire_Info>N</Has_Expire_Info>
@@ -98,7 +98,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
     </Application_URLs>
 <Download_URLs>
         <Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tgz</Primary_Download_URL>
-        <Secondary_Download_URL>http://prdownloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-1.1.tgz</Secondary_Download_URL>
+        <Secondary_Download_URL>http://prdownloads.sourceforge.net/cvschangelogb/cvschangelogbuilder-2.0.tgz</Secondary_Download_URL>
         <Additional_Download_URL_1 />
         <Additional_Download_URL_2 />
     </Download_URLs>
