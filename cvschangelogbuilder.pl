@@ -802,6 +802,9 @@ if (! $CvsRoot) {
 	writeoutput("\n");
 	error("The repository value to use was not provided and could not be detected.\nUse -d=repository option to specifiy repository value.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 }
+if ($OutputDir) {
+    $OutputDir.="/";
+}
 
 $ENV{"CVSROOT"}=$CvsRoot;
 writeoutput(ucfirst($PROG)." launched for CVSRoot: $CvsRoot\n",1);
@@ -1016,7 +1019,6 @@ if ($Output =~ /^buildhtmlreport/) {
 
 # Start of true output
 if ($OutputDir) {
-    $OutputDir.="/";
     open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file '${PROG}_$Module.html' for output in directory '${OutputDir}'.");
 }
 
