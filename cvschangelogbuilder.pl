@@ -315,7 +315,10 @@ sub LoadDataInMemory {
             }
             if ($errorstring) { 
                 warning("Failed to execute command: $command: $errorstring");
-                print CACHE "$relativefilename $filerevisiontoscan ERROR $command: $errorstring\n";
+                if ($Cache{$relativefilename}{$filerevisiontoscan} ne 'ERROR') {
+                    # If it was not in error before, we track the error in cache file
+                    print CACHE "$relativefilename $filerevisiontoscan ERROR $command: $errorstring\n";
+                }
             }
             else {
                 debug("Nb of line : $nbline",2);
@@ -875,6 +878,7 @@ if ($Output =~ /^buildhtmlreport/) {
         print STDERR "time (between several seconds to hours depending on your CVS server response\n";
         print STDERR "time), so please wait...\n";
     }
+    # Open cache file to write new files entries
     open(CACHE,">>$cachefile") || error("Failed to open cache file '$cachefile' for writing");
 }
 
