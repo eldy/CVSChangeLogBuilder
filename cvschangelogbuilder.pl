@@ -101,36 +101,41 @@ my $MAXLASTLOG=500;
 # Return:		None
 #------------------------------------------------------------------------------
 sub mkdir_recursive() {
-   my $mdir = shift;
-   my $array = shift;
+    my $mdir = shift;
+    my $array = shift;
 
-   if (-d $mdir) {
-      return 1;
-   }
+    if ($mdir && -d $mdir) { return 1; }
 
-   $mdir =~ m!(.*)[\/\\]+(.*)!;
-   my ($parent, $dir) = ($1, $2);
-   unless ($parent && $dir) {
-      error("Failed to mkdir '$mdir'\n");
-      return 0;
-   }
+    if ($mdir =~ m/^(.+)[\/\\]+([^\/\\]*)$/) {
+        my ($parent, $dir)=($1, $2);
 
-   unless ($parent && -d $parent) {
-      &mkdir_recursive($parent,$array);
-   }
-
-   if ($parent && -d $parent) {
-      if (mkdir "$parent/$dir") {
-         push @{$array}, "$parent/$dir";
-         #print STDERR "$parent/$dir\n";
-         return 1;
-      } else {
-         error("Cannot mkdir '$parent/$dir', $!\n");
-         return 0;
-      }
-   } else {
-      return 0;
-   }
+        unless ($parent && -d $parent) {
+            &mkdir_recursive($parent,$array);
+        }
+    
+        if ($parent && $dir && -d $parent) {
+            if (mkdir "$parent/$dir") {
+                push @{$array}, "$parent/$dir";
+                #print STDERR "$parent/$dir\n";
+                return 1;
+            } else {
+                error("Cannot mkdir '$parent/$dir', $!\n");
+                return 0;
+            }
+        } else {
+            return 0;
+        }
+    }
+    else {
+        if (mkdir "$mdir") {
+            push @{$array}, "$mdir";
+            #print STDERR "$parent/$dir\n";
+            return 1;
+        } else {
+            error("Cannot mkdir '$mdir', $!\n");
+            return 0;
+        }
+    }
 }
 
 
