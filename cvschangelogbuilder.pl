@@ -858,6 +858,7 @@ if ($Output =~ /^buildhtmlreport/) {
     my $ModuleForCache=$Module;
     $ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
     my $cachefile="${OutputDir}${PROG}_${ModuleForCache}.cache";
+    debug(" Search for cache file '$cachefile' into current directory",1);
     if (-f $cachefile) {
         writeoutput("Load cache file '$cachefile' with number of lines for added files...\n",1);
         open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
@@ -865,7 +866,7 @@ if ($Output =~ /^buildhtmlreport/) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
 #            if ($nbline ne 'ERROR') {
-                debug(" Load cache entry for ($file,$revision)=$nbline",2);
+                debug(" Load cache entry for ($file,$revision)=$nbline",1);
                 $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
 #            }
         }
