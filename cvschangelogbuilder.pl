@@ -13,7 +13,7 @@ use Time::Local;
 # Defines
 #-------------------------------------------------------
 my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
-my $VERSION="1.0 (build $REVISION)";
+my $VERSION="1.1 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd /;
@@ -283,16 +283,16 @@ sub ExcludeRepositoryFromPath {
 # MAIN
 #-------------------------------------------------------
 my $QueryString=''; for (0..@ARGV-1) { $QueryString .= "$ARGV[$_] "; }
-if ($QueryString =~ /debug=(\d+)/i)    		{ $Debug=$1; }
-if ($QueryString =~ /module=([^\s]+)/i)   	{ $Module=$1; }
-if ($QueryString =~ /output=([^\s]+)/i)   	{ $Output=$1; }
-if ($QueryString =~ /branch=([^\s]+)/i)		{ $Branch=$1; }
-if ($QueryString =~ /tagstart=([^\s]+)/i) 	{ $TagStart=$1; }
-if ($QueryString =~ /tagend=([^\s]+)/i)   	{ $TagEnd=$1; }
+if ($QueryString =~ /debug=(\d+)/i)    			{ $Debug=$1; }
+if ($QueryString =~ /m(?:odule|)=([^\s]+)/i)	{ $Module=$1; }
+if ($QueryString =~ /output=([^\s]+)/i)   		{ $Output=$1; }
+if ($QueryString =~ /branch=([^\s]+)/i)			{ $Branch=$1; }
+if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
+if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
-if ($QueryString =~ /-d=([^\s]+)/)      	{ $CvsRoot=$1; }
-if ($QueryString =~ /-h/)      				{ $Help=1; }
-if ($QueryString =~ /-ssh/)    				{ $UseSsh=1 }
+if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
+if ($QueryString =~ /-h/)      					{ $Help=1; }
+if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 ($DIR=$0) =~ s/([^\/\\]*)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 debug("Module: $Module");
 debug("Output: $Output");
@@ -312,45 +312,46 @@ if ($Output) {
 		exit 1;
 	}
 }
-else {
-	$Output="listdeltabydate";
-}
 
-if ($Help || ! $Module || ! $Output) {
+if ($Help || ! $Output) {
 	print "----- $PROG $VERSION (c) Laurent Destailleur -----\n";
 	print "$PROG generates advanced ChangeLog files for CVS projects/modules.\n";
-	print "Note 1: cvs client (cvs or cvs.exe) must be in your PATH.\n";
-	print "Note 2: CVSROOT environment variable must be set, or use -d option.\n";
-	print "Note 3: To use cvs client through ssh, add option -ssh.\n";
+	print "Note 1: Your cvs client (cvs or cvs.exe) must be in your PATH.\n";
+	print "Note 2: To use cvs client through ssh, add option -ssh.\n";
 	print "\nUsage:\n";
-	print "  $PROG.$Extension -module=modulename -output=outputmode [options]\n";
+	print "  $PROG.$Extension -output=outputmode [-m=module -d=repository] [options]\n";
 	print "\n";
-	print "Where outputmode is:\n";
-	print "  listdeltabydate to get a changelog between 2 versions, sorted by date\n";
-	print "  listdeltabylog  to get a changelog between 2 versions, sorted by log\n";
-	print "  listdeltabyfile to get a changelog between 2 versions, sorted by file\n";
-	print "  listdeltaforrpm to get a changelog between 2 versions for rpm spec files\n";
+	print "Where 'outputmode' is:\n";
+	print "  listdeltabydate  To get a changelog between 2 versions, sorted by date\n";
+	print "  listdeltabylog   To get a changelog between 2 versions, sorted by log\n";
+	print "  listdeltabyfile  To get a changelog between 2 versions, sorted by file\n";
+	print "  listdeltaforrpm  To get a changelog between 2 versions for rpm spec files\n";
 	print "\n";
-	print "  Note that 'between 2 versions' means (depending on tagstart/tagend usage):\n";
+	print "  Note that \"between 2 versions\" means (depending on tagstart/tagend usage):\n";
 	print "  * from start to a tagged version (version changes included)\n";
-	print "  * from a start version (excluded) to another tagged versions (included)\n";
+	print "  * from a start version (excluded) to another tagged version (included)\n";
 	print "  * or from a tagged version until now (version changes excluded)\n";
 	print "\n";
-	print "Options:\n";
+	print "The 'module' and 'repository' are the CVS module name and the CVS repository.\n";
+	print "  If current directory is the root of a CVS project built from a cvs checkout,\n";
+	print "  cvschangelogbuilder will retreive module and repository value automatically.\n";
+	print "  If no local copy of repository are available or to force other values, use:\n";
+	print "  -m=module           To force value of module name\n";
+	print "  -d=repository       To force value of CVSROOT\n";
+	print "\n";
+	print "Options are:\n";
 	print "  -branch=branchname  To work on another branch than default branch (!)\n";
 	print "  -tagstart=tagname   To specify start tag version\n";
 	print "  -tagend=tagend      To specify end tag version\n";
-	print "  -rlogfile=rlogfile  To build changelog from existing rlog file\n";
 	print "\n";
 	print "  WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n";
-	print "  BRANCH. It also must be the default branch, if not, you MUST use -branch to\n";
+	print "  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n";
 	print "  give the name of the branch, otherwise you will get unpredicable result.\n";
 	print "\n";
-	print "  -debug=x            To get debug info with level x.\n";
-	print "  -d=CVSROOT          To force value of CVSROOT. This value can be all\n";
-	print "                      values allowed by the CVS Client for CVSROOT variable.\n";
 	print "  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n";
-  	print "\n";
+	print "  -debug=x            To get debug info with level x\n";
+	print "  -rlogfile=rlogfile  To build changelog from an already existing rlog file\n";
+	print "\n";
 	print "Example:\n";
 	print "  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n";
 	print "  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n";
@@ -380,23 +381,71 @@ if ($tomorrowmin < 10) { $tomorrowmin = "0$tomorrowmin"; }
 if ($tomorrowsec < 10) { $tomorrowsec = "0$tomorrowsec"; }
 my $timetomorrow=$tomorrowyear.$tomorrowmonth.$tomorrowday.$tomorrowhour.$tomorrowmin.$tomorrowsec;	
 
-# Check CVSROOT environment variable (needed only if no option -rlogfile)
-if ($CvsRoot) { $ENV{"CVSROOT"}=$CvsRoot; }
-if (! $ENV{"CVSROOT"} && ! $RLogFile) {
-	error("CVSROOT environment variable not defined.\nUse -d option to force its value from command line.\n\nUsage:\n  $PROG.$Extension -module=modulename -output=listdelta [options]\n\nOptions:\n  -tagstart=tagstart To specify start version\n  -tagend=tagend     To specify end version\n  -d=CVSROOT         To force value of CVSROOT. This value can be all\n                     values allowed by the CVS Client for CVSROOT variable.\nExample:\n  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n  $PROG.$Extension -module=mymodule  -output=listdeltabylog  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n");
+# Check/Retreive module
+if (! $Module) {
+	if (-s "CVS/Repository") {
+		open(REPOSITORY,"<CVS/Repository") || error("Failed to open 'CVS/Repository' file to get module name.");
+		while (<REPOSITORY>) {
+			chomp $_; s/\r$//;
+			$Module=$_;
+			last;
+		}
+		close(REPOSITORY);
+	}
+}
+if (! $Module) {
+	print "\n";
+	error("The module name was not provided and could not be detected.\nUse -m=cvsmodulename option to specifiy module name.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
+}
+print ucfirst($PROG)." launched for module: $Module\n";
+
+# Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile)
+if (! $RLogFile) {
+	if (! $CvsRoot) {
+		# Try to set CvsRoot from CVS repository
+		if (-s "CVS/Root") {
+			open(REPOSITORY,"<CVS/Root") || error("Failed to open 'CVS/Root' file to get repository value.");
+			while (<REPOSITORY>) {
+				chomp $_; s/\r$//;
+				$CvsRoot=$_;
+				last;
+			}
+			close(REPOSITORY);
+		}
+	}
+	if (! $CvsRoot) {
+		# Try to set CvsRoot from CVSROOT environment variable
+		if ($ENV{"CVSROOT"}) { $CvsRoot=$ENV{"CVSROOT"}; }
+	}
+	if (! $CvsRoot) {
+		print "\n";
+		error("The repository value to use was not provided and could not be detected.\nUse -d=repository option to specifiy repository value.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
+	}
+
+	$ENV{"CVSROOT"}=$CvsRoot;
+	print ucfirst($PROG)." launched for repository: $CvsRoot\n";
+
 }
 
+
+# Set use of ssh or not
 if ($UseSsh) {
 	print "Set CVS_RSH=ssh\n";
 	$ENV{'CVS_RSH'}='ssh';
 }
 
+# SUMMARY OF PARAMETERS
+#------------------------------------------
+
 # LAUNCH CVS COMMAND RLOG TO WRITE RLOGFILE
 #------------------------------------------
 if (! $RLogFile) {
 	# Define temporary file
-	my $TmpFile=$ENV{"TMP"}."/$PROG.$$.tmp";
-	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file for writing. Check directory and permissions.");
+	my $TmpDir="";
+	$TmpDir||=$ENV{"TMP"};
+	$TmpDir||=$ENV{"TEMP"};
+	my $TmpFile="$TmpDir/$PROG.$$.tmp";
+	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file '$TmpFile' for writing. Check directory and permissions.");
 	my $command;
 	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
 	if ($Branch) {
@@ -405,7 +454,7 @@ if (! $RLogFile) {
 	else {
 		$command="$CVSCLIENT -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
-	print "Building temporary 'cvs rlog' file '$TmpFile'\n";
+	print "Building temporary cvs rlog file '$TmpFile'\n";
 	print "with command '$command'\n";
 	debug("CVSROOT value is '".$ENV{"CVSROOT"}."'");
 	my $result=`$command 2>&1`;
@@ -419,7 +468,7 @@ if (! $RLogFile) {
 
 # ANALYZE RLOGFILE
 #------------------------
-print("Formating output $Output from rlog file '$RLogFile'...\n");
+print("Formating output $Output from rlog file '$RLogFile'...\n\n");
 debug("Formating output $Output from rlog file '$RLogFile'...");
 open(RLOGFILE,"<$RLogFile") || error("Can't open rlog file");
 my $waitfor="filename";
