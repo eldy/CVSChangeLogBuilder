@@ -764,7 +764,7 @@ if (! $Module) {
 # Start of true output
 if ($OutputDir) {
     $OutputDir.="/";
-    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file ${PROG}_$Module.html for output.");
+    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Failed to open file ${OutputDir}${PROG}_$Module.html for output.");
 }
 
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
