@@ -92,9 +92,58 @@ my %UserChangeLineChange=();
 my $MAXLASTLOG=500;
 
 
-#-------------------------------------------------------
+#------------------------------------------------------------------------------
 # Functions
-#-------------------------------------------------------
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# Function:		mkdir_recursive
+# Return:		None
+#------------------------------------------------------------------------------
+sub mkdir_recursive() {
+   my $mdir = shift;
+   my $array = shift;
+
+   if (-d $mdir) {
+      return 1;
+   }
+
+   $mdir =~ m!(.*)[\/\\]+(.*)!;
+   my ($parent, $dir) = ($1, $2);
+   unless ($parent && $dir) {
+      error("Failed to mkdir '$mdir'\n");
+      return 0;
+   }
+
+   unless ($parent && -d $parent) {
+      &mkdir_recursive($parent,$array);
+   }
+
+   if ($parent && -d $parent) {
+      if (mkdir "$parent/$dir") {
+         push @{$array}, "$parent/$dir";
+         #print STDERR "$parent/$dir\n";
+         return 1;
+      } else {
+         error("Cannot mkdir '$parent/$dir', $!\n");
+         return 0;
+      }
+   } else {
+      return 0;
+   }
+}
+
+
+#------------------------------------------------------------------------------
+# Function:		Write a warning message
+# Parameters:	$message
+# Input:		$HeaderHTTPSent $HeaderHTMLSent $WarningMessage %HTMLOutput
+# Output:		None
+# Return:		None
+#------------------------------------------------------------------------------
+sub warning {
+	print STDERR "Warning: $_[0]\n";
+}
 
 #-------------------------------------------------------
 # Error
@@ -135,7 +184,6 @@ sub writeoutput {
 sub LoadDataInMemory {
 
 	# Define filename
-	#my $newfilename=ExcludeRepositoryFromPath("$filename");
 	my $newfilename=$filename;
 
 	# Define filelog
@@ -147,12 +195,12 @@ sub LoadDataInMemory {
 	my $newfilestate='';
 	if ($Output =~ /^listdelta/ || $Output =~ /^buildhtmlreport/) {
 		if ($Branch) {
-			# We want a delta in a secondary BRANCH: Change status can't be defined
+			# We work in a secondary BRANCH: Change status can't be defined
 			if (!$filesym{$filename}{$Branch}) { return; }		# This entry is not in branch 
 			$newfilestate="unknown";
 		}
 		else {
-			# We want a delta in main BRANCH
+			# We work in main BRANCH
 			if ($TagStart && $filesym{$filename}{$TagStart}) {
 				# File did exist at the beginning
 				if ($TagEnd && ! $filesym{$filename}{$TagEnd}) {	# File was removed between TagStart and TagEnd
@@ -168,14 +216,14 @@ sub LoadDataInMemory {
 				}
 			}
 			else {
-				# File did not exist at the beginning
+				# File did not exist for required start
 				if (! $TagEnd || $filesym{$filename}{$TagEnd}) {		# File was added after TagStart (and before TagEnd)
 					# If file contains Attic, this means it was removed so, as it didn't exists in start tag version,
-					# this means we can ignore this file.
-					if ($filename =~ /[\\\/]Attic([\\\/][^\\\/]+)/) { return; }
+					# this means we can ignore this file if we need a delta.
+					if ($filename =~ /[\\\/]Attic([\\\/][^\\\/]+)/ && $Output =~ /^listdelta/) { return; }
 					if ($filestate !~ /dead/) {
 						if ($filechange) {
-							$newfilestate="changed";	# Sometimes it should be "added" (if added after a remove). This will be corrected later.
+							$newfilestate="changed";	# TODO Sometimes it should be "added" (if added after a remove). This will be corrected later.
 						}
 						else {	# A file added after TagStart
 							$newfilestate="added";
@@ -193,24 +241,65 @@ sub LoadDataInMemory {
 		}
 	}
 	# We know state
-	# If added or removed, value for lines added and deleted is not correct, so we download file to count it
+	# If added or removed, value for lines added and deleted is not correct, so we download file to count them
     if ($Output =~ /^buildhtmlreport/ && $newfilestate eq 'added' && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
+	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
         if (! defined $Cache{$relativefilename}{$filerevision}) {
-            # If number of file not available in cache file
-	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -r $filerevision $relativefilename";
-	        debug("Getting file $filename revision $filerevision\n",2);
-	        debug("with command '$command'\n",2);
+            # If number of lines for file not available in cache file, we download file
+            #--------------------------------------------------------------------------
+            my $filenametoget=$relativefilenamekeepattic;
+            # Create dir if not exists
+            my @added_dir_to_remove=();
+            my @added_files_to_remove=();
+            if ($filenametoget =~ /Attic\//) {
+                my $dir=$filenametoget; $dir =~ s/[\/\\]*[^\/\\]+$//;
+                if ($dir) {
+                    &mkdir_recursive("$dir/CVS",\@added_dir_to_remove);
+                    if (! -f "$dir/CVS/Entries") {
+                        push @added_files_to_remove, "$dir/CVS/Entries";
+                        open(ENTRIESFILE,">$dir/CVS/Entries");
+                        close(ENTRIESFILE);
+                    }
+                    if (! -f "$dir/CVS/Repository") {
+                        push @added_files_to_remove, "$dir/CVS/Repository";
+                	    my $relativepath=$relativefilename; $relativepath =~ s/[\\\/][^\/\\]+$//;
+                        open(REPOSITORY,">$dir/CVS/Repository");
+                        print REPOSITORY "$Module/$relativepath";
+                        close(REPOSITORY);
+                    }
+                }
+            }
+            
+	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -d -r $filerevision $filenametoget";
+	        debug("Getting file '$relativefilename' revision '$filerevision'\n",3);
+	        debug("with command '$command'\n",3);
+            my $errorstring='';
             my $pid = open(PH, "$command 2>&1 |");
             while (<PH>) {
                 #chomp $_; s/\r$//;
-                #debug($_);
+                debug("$_");
+                if ($_ =~ /cvs \[update aborted\]:/) { $errorstring=$_; $nbline=0; last; }
                 $nbline++;
             }   
-            debug("Nb of line : $nbline",2);
-            # Save result in a cache for other run
-            print CACHE "$relativefilename $filerevision $nbline $fileformat\n";
+            foreach my $filetodelete (@added_files_to_remove) {
+                #print STDERR "remove file $filetodelete\n";
+                unlink $filetodelete;
+            }
+            foreach my $dirtodelete (reverse @added_dir_to_remove) {
+                #print STDERR "remove dir $dirtodelete\n";
+                rmdir $dirtodelete;
+            }
+            if ($errorstring) { 
+                warning("Failed to execute command: $command: $errorstring");
+            }
+            else {
+                debug("Nb of line : $nbline",2);
+                # Save result in a cache for other run
+                print CACHE "$relativefilename $filerevision $nbline $fileformat\n";
+            }
+            close(PH);
         }
         else {
             $nbline=$Cache{$relativefilename}{$filerevision};
@@ -461,7 +550,8 @@ sub DecreaseVersion {
 #------------------------------------------------------------------------------
 sub ExcludeRepositoryFromPath {
 	my $file=shift;
-	$file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/;
+	my $keepattic=shift;
+	if (! $keepattic) { $file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/; }
 	$file =~ s/^$RepositoryPath[\\\/]$Module[\\\/]//;		# Extract path of repository
 	return $file;
 }
@@ -705,7 +795,7 @@ if (! $RLogFile) {
 	else {
 		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
-	writeoutput("Building temporary cvs rlog file '$TmpFile'\n",1);
+	writeoutput("Downloading temporary cvs rlog file '$TmpFile'\n",1);
 	writeoutput("with command '$command'\n",1);
 	debug("CVSROOT value is '".$ENV{"CVSROOT"}."'");
 	my $result=`$command 2>&1`;
@@ -759,7 +849,6 @@ while (<RLOGFILE>) {
 			# We found a new filename
 			$waitfor="symbolic_name";
 			debug("Found a new file '$filename'",2);
-			#filename=ExcludeRepositoryFromPath($filename);
 			$maxincludedver{"$filename"}=0;
 			$minexcludedver{"$filename"}=0;
 		}
@@ -1206,6 +1295,7 @@ if ($Output =~ /buildhtmlreport$/) {
     }
     until ($cursor > $maxyearmonth);
 
+    
 print <<EOF;
 
 <a name="menu">&nbsp;</a>
@@ -1216,7 +1306,11 @@ print <<EOF;
 </table>
 </td></tr></table>
 <br />
+EOF
 
+    print "<font color=red>Warning: In this version, lines of code for files that were completely removed from repository are not yet substracted. That's why, if you removed a lot of file, the 'Lines of code' information is for the moment higher than truth.</font><br><br>";
+
+print <<EOF;
 <a name="parameters">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0">
 <tr><td class="aws_title" width="70%">Analysis' parameters</td><td class="aws_blank">&nbsp;</td></tr>
