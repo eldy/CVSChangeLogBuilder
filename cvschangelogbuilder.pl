@@ -264,7 +264,7 @@ sub LoadDataInMemory {
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
-        if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} eq 'ERROR') {
+        if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR/) {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
@@ -316,7 +316,7 @@ sub LoadDataInMemory {
             }
             if ($errorstring) { 
                 warning("Failed to execute command: $command: $errorstring");
-                if ($Cache{$relativefilename}{$filerevisiontoscan} ne 'ERROR') {
+                if ($Cache{$relativefilename}{$filerevisiontoscan} !~ /^ERROR/) {
                     # If it was not in error before, we track the error in cache file
                     print CACHE "$relativefilename $filerevisiontoscan ERROR $command: $errorstring\n";
                 }
