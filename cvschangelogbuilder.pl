@@ -141,6 +141,7 @@ sub LoadDataInMemory {
 	# Define filelog
 	my $newfilelog="$filelog";
 	$newfilelog =~ s/\n\s*\n/\n/g;					# Remove blank lines
+	$newfilelog =~ s/^\s*[\r\n]*//g;				# Remove starting blank
 
 	# DEFINE CHANGE STATUS (removed, changed or added) OF FILE
 	my $newfilestate='';
