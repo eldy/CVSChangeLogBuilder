@@ -582,7 +582,7 @@ sub ExcludeRepositoryFromPath {
 	my $file=shift;
 	my $keepattic=shift;
 	if (! $keepattic) { $file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/; }
-	$file =~ s/^$RepositoryPath[\\\/]$Module[\\\/]//;		# Extract path of repository
+	$file =~ s/^(\w:)?$RepositoryPath[\\\/]$Module[\\\/]//;		# Extract path of repository
 	return $file;
 }
 
@@ -634,7 +634,7 @@ if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
 my $REPRACINE;
 if (! $ENV{"SERVER_NAME"}) {
-	$REPRACINE="$DIR/..";
+	$REPRACINE=($DIR?$DIR:".")."/..";
 } else {
 	$REPRACINE=$ENV{"DOCUMENT_ROOT"};
 }
@@ -764,7 +764,7 @@ if (! $Module) {
 # Start of true output
 if ($OutputDir) {
     $OutputDir.="/";
-    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Failed to open file ${OutputDir}${PROG}_$Module.html for output.");
+    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file '${PROG}_$Module.html' for output in directory '${OutputDir}'.");
 }
 
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
@@ -855,7 +855,7 @@ writeoutput("Analyzing rlog file '$RLogFile'\n",1);
 if ($Output =~ /^buildhtmlreport/) {
     my $ModuleForCache=$Module;
     $ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
-    my $cachefile="${PROG}_${ModuleForCache}.cache";
+    my $cachefile="${OutputDir}${PROG}_${ModuleForCache}.cache";
     if (-f $cachefile) {
         writeoutput("Load cache file '$cachefile' with number of lines for added files...\n",1);
         open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
@@ -869,7 +869,7 @@ if ($Output =~ /^buildhtmlreport/) {
         }
         close CACHE;
     } else {
-        print STDERR "No cache file can found. This probably means you running $PROG for\n";
+        print STDERR "No cache file can be found. This probably means you run $PROG for\n";
         print STDERR "the first time. Building cache for the first update can take a very long\n";
         print STDERR "time (between several seconds to hours depending on your CVS server response\n";
         print STDERR "time), so please wait...\n";
@@ -961,10 +961,14 @@ while (<RLOGFILE>) {
 			$filedate=$1; $fileuser=$2; $filestate=$3; $filechange=$4;
 			$filedate =~ s/\///g;
 			$filelineadd=0; $filelinedel=0; $filelinechange=0;
-			$filechange =~ s/.*([\+\-]\d+)\s+([\+\-]\d+).*/$1$2/g;
-            $filelineadd=int($1); $filelinedel=(-int($2));
-		    if ($filelineadd>=$filelinedel) { $filelineadd-=$filelinedel; $filelinechange=$filelinedel; $filelinedel=0; }
-		    else { $filelinedel-=$filelineadd; $filelinechange=$filelineadd; $filelineadd=0; }
+			if ($filechange =~ s/.*([\+\-]\d+)\s+([\+\-]\d+).*/$1$2/g) {
+            	$filelineadd=int($1); $filelinedel=(-int($2));
+		    	if ($filelineadd>=$filelinedel) { $filelineadd-=$filelinedel; $filelinechange=$filelinedel; $filelinedel=0; }
+		    	else { $filelinedel-=$filelineadd; $filelinechange=$filelineadd; $filelineadd=0; }
+			}
+			else {
+				$filechange="";	# It's not a change but an add with cvsnt (+x -x are not reported with cvsnt)
+			}
 			$filedate =~ s/[\s;]+$//; $fileuser =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
 			$waitfor="log";
 			debug("Found a new date/user/state/lines $filedate $fileuser $filestate $filelineadd $filelinedel $filelinechange",2);
