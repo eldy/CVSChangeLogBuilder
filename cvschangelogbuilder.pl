@@ -52,7 +52,7 @@ my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs";
-my $COMP=" -z 6 ";
+my $COMP="-z 6";
 my $ViewCvsUrl="";
 my $ENABLEREQUESTFORADD=1;
 # ---------- Init Regex --------
@@ -99,7 +99,7 @@ my $MAXLASTLOG=500;
 # Error
 #-------------------------------------------------------
 sub error {
-	print "Error: $_[0]\n";
+	print STDERR "Error: $_[0]\n";
     exit 1;
 }
 
@@ -192,21 +192,23 @@ sub LoadDataInMemory {
 	}
 	# We know state
 	# If added or removed, value for lines added and deleted is not correct, so we download file to count it
-    if ($newfilestate eq 'added' && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
+    if ($Output =~ /^buildhtmlreport/ && $newfilestate eq 'added' && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
         if (! defined $Cache{$relativefilename}{$filerevision}) {
             # If number of file not available in cache file
-	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -r $filerevision $relativefilename $Module";
+	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -r $filerevision $relativefilename";
 	        debug("Getting file $filename revision $filerevision\n",2);
 	        debug("with command '$command'\n",2);
-            my $pid = open(PH, "$command 2>&1 |");                 # with an open pipe
+            my $pid = open(PH, "$command 2>&1 |");
             while (<PH>) {
+                #chomp $_; s/\r$//;
+                #debug($_);
                 $nbline++;
             }   
             debug("Nb of line : $nbline",2);
             # Save result in a cache for other run
-            print CACHE "$relativefilename $filerevision $nbline\n";
+            print CACHE "$relativefilename $filerevision $nbline $fileformat\n";
         }
         else {
             $nbline=$Cache{$relativefilename}{$filerevision};
@@ -281,7 +283,7 @@ sub LoadDataInMemory {
 	}
 	
 	if ($Output =~ /^buildhtmlreport/) {
-	    if (! $AuthorChangeLast{$fileauthor} || $AuthorChangeLast{$fileauthor} < $filedate) { $AuthorChangeLast{$fileauthor}=$filedate; }
+	    if (! $AuthorChangeLast{$fileauthor} || int($AuthorChangeLast{$fileauthor}) < int($filedate)) { $AuthorChangeLast{$fileauthor}=$filedate; }
 	    $AuthorChangeCommit{$fileauthor}{$filename}++;
 	    if ($fileformat ne 'b') {
 	        $AuthorChangeLineAdd{$fileauthor}+=$filelineadd;
@@ -307,7 +309,7 @@ sub CleanFromTags {
 
 #------------------------------------------------------------------------------
 # Function:      Format a date
-# Input:         String "YYYY/MM/DD HH:MM:SS xxx"
+# Input:         String "YYYYMMDD HH:MM:SS xxx"
 #                Option "" or "rpm"
 # Return:        string "YYYY-MM-DD HH:MM:SS xxx" if option is ""
 #                String "Thu Mar 7 2002 xxx" if option is "rpm"
@@ -316,15 +318,17 @@ sub CleanFromTags {
 sub FormatDate {
 	my $string=shift;
 	my $option=shift;
-	$string =~ s/\//\-/g;
-	if ($option eq 'rpm' && $string =~ /(\d\d\d\d)-(\d\d)-(\d\d)/) {
+	if ($option eq 'rpm' && $string =~ /(\d\d\d\d)(\d\d)(\d\d)/) {
 		my $ns=Time::Local::timelocal(0,0,0,$3,$2-1,$1);
 		my $ctime=localtime($ns); $ctime =~ s/ 00:00:00//;
-		$string =~ s/(\d\d\d\d)-(\d\d)-(\d\d)/$ctime/;
+		$string =~ s/(\d\d\d\d)(\d\d)(\d\d)/$ctime/;
 	}
-	if ($option eq 'simple' && $string =~ /(\d\d\d\d)-(\d\d)-(\d\d)\s(\d\d):(\d\d)/) {
+	elsif ($option eq 'simple' && $string =~ /(\d\d\d\d)(\d\d)(\d\d)\s(\d\d):(\d\d)/) {
         $string="$1-$2-$3 $4:$5";
 	}
+    elsif ($string =~ /(\d\d\d\d)(\d\d)(\d\d)/) {
+        $string="$1-$2-$3";
+    }
 	return "$string";
 }
 
@@ -540,7 +544,9 @@ if ($tomorrowsec < 10) { $tomorrowsec = "0$tomorrowsec"; }
 my $timetomorrow=$tomorrowyear.$tomorrowmonth.$tomorrowday.$tomorrowhour.$tomorrowmin.$tomorrowsec;	
 
 # Check/Retreive module
-if (! $Module) {
+my $ModuleChoosed=$Module;
+if (! $Module || $Output =~ /^buildhtmlreport/) {
+    $Module='';
 	if (-s "CVS/Repository") {
 		open(REPOSITORY,"<CVS/Repository") || error("Failed to open 'CVS/Repository' file to get module name.");
 		while (<REPOSITORY>) {
@@ -551,6 +557,10 @@ if (! $Module) {
 		close(REPOSITORY);
 	}
 }
+if ($Output =~ /^buildhtmlreport/ && $ModuleChoosed && $Module && $Module ne $ModuleChoosed) {
+	writeoutput("\n");
+	error("$PROG is launched from a checkout root directory of module '$Module' but you ask a report for module '$ModuleChoosed'.");
+}
 if (! $Module) {
 	writeoutput("\n");
 	error("The module name was not provided and could not be detected.\nUse -m=cvsmodulename option to specifiy module name.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
@@ -558,9 +568,10 @@ if (! $Module) {
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
 # Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile || buildhtmlreport)
-if (! $RLogFile || $Output =~ /buildhtmlreport/) {
-	if (! $CvsRoot) {
-		# Try to set CvsRoot from CVS repository
+if (! $RLogFile || $Output =~ /^buildhtmlreport/) {
+	my $CvsRootChoosed=$CvsRoot;
+	if (! $CvsRoot || $Output =~ /^buildhtmlreport/) {
+		# Try to get CvsRoot from CVS repository
 		if (-s "CVS/Root") {
 			open(REPOSITORY,"<CVS/Root") || error("Failed to open 'CVS/Root' file to get repository value.");
 			while (<REPOSITORY>) {
@@ -571,6 +582,10 @@ if (! $RLogFile || $Output =~ /buildhtmlreport/) {
 			close(REPOSITORY);
 		}
 	}
+    if ($Output =~ /^buildhtmlreport/ && $CvsRootChoosed && $CvsRoot && $CvsRoot ne $CvsRootChoosed) {
+	    writeoutput("\n");
+    	error("$PROG is launched from a checkout root directory of module '$Module' with cvsroot '$CvsRoot' but you ask a report ".($ModuleChoosed?"for module '$ModuleChoosed' ":"")."with a different cvsroot '$CvsRootChoosed'.");
+    }
 	if (! $CvsRoot) {
 		# Try to set CvsRoot from CVSROOT environment variable
 		if ($ENV{"CVSROOT"}) { $CvsRoot=$ENV{"CVSROOT"}; }
@@ -603,6 +618,7 @@ if (! $RLogFile) {
 	my $TmpDir="";
 	$TmpDir||=$ENV{"TMP"};
 	$TmpDir||=$ENV{"TEMP"};
+	$TmpDir||='/tmp';
 	my $TmpFile="$TmpDir/$PROG.$$.tmp";
 	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file '$TmpFile' for writing. Check directory and permissions.");
 	my $command;
@@ -635,7 +651,7 @@ if ($Output =~ /^buildhtmlreport/) {
         open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
         while (<CACHE>) {
             chomp $_; s/\r$//;
-            my ($file,$revision,$nbline)=split(/\s+/,$_);
+            my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
             debug(" Add entry in cache for ($file,$revision)=$nbline",2);
             $Cache{$file}{$revision}=$nbline;
         }
@@ -729,8 +745,9 @@ while (<RLOGFILE>) {
 		if ($line =~ /$EXTRACTFILEDATEAUTHORSTATE/i) {
 			# We found date/author line
 			$filedate=$1; $fileauthor=$2; $filestate=$3; $filechange=$4;
-			$filechange =~ s/[^\s\d\+\-]+//g;
+			$filedate =~ s/\///g;
 			$filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$filechange =~ s/[^\s\d\+\-]+//g;
 			foreach my $key (split(/\s+/,$filechange)) {
 			    if (int($key)>0) { $filelineadd=int($key); }
 			    if (int($key)<0) { $filelinedel=(-int($key)); }
@@ -768,13 +785,15 @@ while (<RLOGFILE>) {
 	}
 }
 close RLOGFILE;
-close CACHE;
+if ($Output =~ /^buildhtmlreport/) {
+    close CACHE;
+}
 
 
 
 # BUILD OUTPUT
 #------------------------
-writeoutput("Build output for option '$Output'\n",1);
+writeoutput("\nBuild output for option '$Output'\n",1);
 
 # Build header
 my $headstring='';
@@ -1010,7 +1029,7 @@ print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"a
 print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"2\"><b>$rangestring</b></td></tr>";
 print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"2\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
 print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Active developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
-print "<tr><td bgcolor=\"$colorcommit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove files</td></tr>";
+print "<tr><td bgcolor=\"$colorcommit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove file</td></tr>";
 print <<EOF;
 </table></td></tr></table><br />
 
@@ -1031,7 +1050,7 @@ print "<tr><td>&nbsp;</td>";
 my %yearmonth=();
 foreach my $dateuser (sort keys %DateAuthor) {
     my ($date,$user)=split(/\s+/,$dateuser);
-    if ($date =~ /^(\d\d\d\d).(\d\d).\d\d/) {
+    if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
     	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
     		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
                 my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
@@ -1114,15 +1133,15 @@ print <<EOF;
 <tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$colorfile" width="140">Different files commited</th><th bgcolor="$colorcommit" width="140">Number of commits</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$colorcommit" width="140">Number of commits</th><th bgcolor="$colorfile" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
 foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
     print "<tr><td class=\"aws\">";
     print $key;
     print "</td><td>";
-    print $nbfile{$key};
-    print "</td><td>";
     print $nbcommit{$key};
+    print "</td><td>";
+    print $nbfile{$key};
     print "</td><td>";
     print $AuthorChangeLineAdd{$key}." / ".$AuthorChangeLineChange{$key}." / ".$AuthorChangeLineDel{$key};
     print "</td><td>";
