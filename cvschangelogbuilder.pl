@@ -263,7 +263,7 @@ sub LoadDataInMemory {
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
-        if (! defined $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} eq 'ERROR') {
+        if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} eq 'ERROR') {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
