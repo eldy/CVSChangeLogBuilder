@@ -31,7 +31,7 @@ I - Files
 	The distribution of cvschangelogbuilder package includes the following files:
 	README.TXT                      This file
 	cvschangelogbuilder.pl          The cvschangelogbuilder tool.
-    images/*                        Just some icones of project
+    docs/*                          The changelog and PAD files.
     
 
 II - ABOUT THE AUTHOR, LICENSE AND SUPPORT
