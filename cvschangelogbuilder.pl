@@ -129,7 +129,7 @@ sub writeoutput {
 
 #-------------------------------------------------------
 # LoadDataInMemory
-# Add entries in Hash arrays
+# Load cache entries in Hash
 #-------------------------------------------------------
 sub LoadDataInMemory {
 
@@ -652,7 +652,7 @@ if ($Output =~ /^buildhtmlreport/) {
         while (<CACHE>) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
-            debug(" Add entry in cache for ($file,$revision)=$nbline",2);
+            debug(" Load cache entry for ($file,$revision)=$nbline",2);
             $Cache{$file}{$revision}=$nbline;
         }
         close CACHE;
@@ -1028,7 +1028,7 @@ EOF
 print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"aws\" colspan=\"2\"><b>$Module</b></td></tr>";
 print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"2\"><b>$rangestring</b></td></tr>";
 print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"2\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
-print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Active developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
+print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Number of developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
 print "<tr><td bgcolor=\"$colorcommit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove file</td></tr>";
 print <<EOF;
 </table></td></tr></table><br />
@@ -1045,7 +1045,7 @@ print <<EOF;
 <center>
 EOF
 print "<table>";
-print "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in existing non binary files (source files). If, when you add new files, to CVS repository, they were empty, and if you did not removed any file, this also represent the total amount of lines in your code (Because in this case all added/removed lines were reported by CVS, so are correctly calculated in this chart. Otherwise lines already present in files, when they were added to CVS, are not included)</td></tr>\n";
+print "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
 print "<tr><td>&nbsp;</td>";
 my %yearmonth=();
 foreach my $dateuser (sort keys %DateAuthor) {
@@ -1164,7 +1164,7 @@ print <<EOF;
 <table class="aws_data lastlogs" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
 my $width=140;
-print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Authors</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
 foreach my $dateuser (reverse sort keys %DateAuthor) {
     my ($date,$user)=split(/\s+/,$dateuser);
