@@ -69,6 +69,7 @@ my %DateAuthor=();
 my %DateAuthorLog=();
 my %DateAuthorLogFileRevState=();
 my %DateAuthorLogFileRevLine=();
+my %HourAuthor=();
 # For output by file
 my %FilesLastVersion=();
 my %FilesChangeDate=();
@@ -223,9 +224,12 @@ sub LoadDataInMemory {
 	
 	# For output by date
 	if ($Output =~ /bydate/ || $Output =~ /forrpm/ || $Output =~ /buildhtmlreport/) {
-		my $fileday=$filedate; $fileday =~ s/\s.*//g;
-		$DateAuthor{"$fileday $fileauthor"}=1;
-		$DateAuthorLog{"$fileday $fileauthor"}{$newfilelog}=1;
+		$filedate=~/(\d\d\d\d\d\d\d\d)\s(\d\d)/;
+		my $fileday=$1;
+		my $filehour=$2;
+		$HourAuthor{"$filehour $fileauthor"}++;
+		$DateAuthor{"$fileday $fileauthor"}++;
+		$DateAuthorLog{"$fileday $fileauthor"}{$newfilelog}++;
 		$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
 		if ($newfilestate eq 'removed') {
 			# Change a state of a revision from "changed" into "added" when previous revision was "removed"
@@ -423,6 +427,25 @@ sub ExcludeRepositoryFromPath {
 	return $file;
 }
 
+#------------------------------------------------------------------------------
+# Function:     Return day of week of a day
+# Parameters:	"$year$month$day"
+# Return:		1-7 (1 = monday, 7=sunday)
+#------------------------------------------------------------------------------
+sub DayOfWeek {
+	shift =~ /(\d\d\d\d)(\d\d)(\d\d)/;
+	my ($day, $month, $year) = ($3, $2, $1);
+	if ($Debug) { debug("DayOfWeek for $day $month $year",4); }
+	if ($month < 3) {  $month += 10;  $year--; }
+	else { $month -= 2; }
+	my $cent = sprintf("%1i",($year/100));
+	my $y = ($year % 100);
+	my $dw = (sprintf("%1i",(2.6*$month)-0.2) + $day + $y + sprintf("%1i",($y/4)) + sprintf("%1i",($cent/4)) - (2*$cent)) % 7;
+	$dw += 7 if ($dw<0);
+    if (! $dw) { $dw = 7; } # It's sunday
+	if ($Debug) { debug(" is $dw",4); }
+	return $dw;
+}
 
 
 #-------------------------------------------------------
@@ -979,8 +1002,22 @@ if ($Output =~ /bylog$/) {
 if ($Output =~ /buildhtmlreport$/) {
     writeoutput("Generating HTML report...\n");
 
-    my $colorfile="#AA88BB";
-    my $colorcommit="#9988EE";
+
+    my ($errorstringlines,$errorstringpie,$errorstringbars)=();
+    if (!eval ('require "GD/Graph/lines.pm";')) { 
+        $errorstringlines=($@?"Error: $@":"Error: Need Perl module GD::Graph::lines");
+    }
+    if (!eval ('require "GD/Graph/pie.pm";')) { 
+        $errorstringpie=($@?"Error: $@":"Error: Need Perl module GD::Graph::pie");
+    }
+    if (!eval ('require "GD/Graph/bars.pm";')) { 
+        $errorstringbars=($@?"Error: $@":"Error: Need Perl module GD::Graph::bars");
+    }
+
+    my $color_commit="#9988EE";
+    my $color_file="#AA88BB";
+    my $color_lightgrey="#F0F0F0";
+    my $color_grey="#888888";
     
     # Made some calculation on commits by author
     my %nbcommit=(); my %nbfile=();
@@ -1029,7 +1066,7 @@ print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"a
 print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"2\"><b>$rangestring</b></td></tr>";
 print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"2\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
 print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Number of developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
-print "<tr><td bgcolor=\"$colorcommit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove file</td></tr>";
+print "<tr><td bgcolor=\"$color_commit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove file</td></tr>";
 print <<EOF;
 </table></td></tr></table><br />
 
@@ -1044,38 +1081,37 @@ print <<EOF;
 <tr><td align="center">
 <center>
 EOF
+
+# LINES OF CODE
+#--------------
+
 print "<table>";
 print "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
 print "<tr><td>&nbsp;</td>";
-my %yearmonth=();
-foreach my $dateuser (sort keys %DateAuthor) {
-    my ($date,$user)=split(/\s+/,$dateuser);
-    if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
-    	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-    		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
-                my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
-                $yearmonth{"$1$2"}+=int($add);
-                $yearmonth{"$1$2"}+=int($del);
-            }
-        }
-    }
-}
-
 # Build chart
-my $errorstring='';
-if (!eval ('require "GD/Graph/lines.pm";')) { 
-    $errorstring=($@?"Error: $@":"Error: Need Perl module GD::Graph");
+if ($errorstringlines) {
+    print "<td>Perl module GD::Graph must be installed to get charts</td>";   
 }
-if (! $errorstring) {
+else {
     my @absi=(); my @ordo=(); my $cumul=0;
-    # We need to build array values for char and complete holes
+    my %yearmonth=();
     my $mincursor='';
     my $maxcursor='';
-    foreach my $key (sort keys %yearmonth) {
-        if (! $mincursor) { $mincursor=$key; }
-        $maxcursor=$key;
+    foreach my $dateuser (sort keys %DateAuthor) {  # By ascending date
+        my ($date,$user)=split(/\s+/,$dateuser);
+        if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
+        	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
+        		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+                    my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
+                    $yearmonth{"$1$2"}+=int($add);
+                    $yearmonth{"$1$2"}+=int($del);
+                }
+            }
+            if (! $mincursor) { $mincursor="$1$2"; }
+            $maxcursor="$1$2";
+        }
     }
-    # Here mincursor and maxcursor are defined to min and max value
+    # Define absi and ordo and complete holes
     my $cursor=$mincursor;
     do {
         $cumul+=$yearmonth{$cursor};
@@ -1085,26 +1121,17 @@ if (! $errorstring) {
         $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
     }
     until ($cursor > $maxcursor);
-    my $pngfile="${PROG}_${Module}_1.png";
+    # Build graph
+    my $pngfile="${PROG}_${Module}_codelines.png";
     my @data = ([@absi],[@ordo]);
-    my $graph = GD::Graph::lines->new(700, 300);
+    my $graph = GD::Graph::lines->new(640, 240);
     $graph->set( 
           #title             => 'Some simple graph',
           transparent       =>1,
-          x_label           =>'Month',
-          x_label_position  =>0.5,
-          x_label_skip      =>6,
-          x_all_ticks       =>1,
-          x_long_ticks      =>0,
-          x_ticks           =>1,
-          y_label           =>'Code lines',
-          y_min_value       =>0,
-          y_label_skip      =>1,
-          y_long_ticks      =>1,
-          y_tick_number     =>10,
-          #y_number_format   => "%06d",
-          boxclr            =>qw(#F0F0F0),
-          fgclr             =>qw(#888888),
+          x_label           =>'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
+          y_label           =>'Code lines', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, y_tick_number =>10, #y_number_format   => "%06d",
+          boxclr            =>$color_lightgrey,
+          fgclr             =>$color_grey,
           line_types        =>[1, 2, 3],
           dclrs             => [ qw(blue green pink blue) ]
           #borderclrs        => [ qw(blue green pink blue) ],
@@ -1114,10 +1141,8 @@ if (! $errorstring) {
     binmode IMG;
     print IMG $gd->png;
     close IMG;
+    # End build graph
     print "<td><img src=\"$pngfile\" border=\"0\"></td>";
-}
-else {
-    print "<td>Perl module GD::Graph must be installed to get charts</td>";   
 }
 print "<td>&nbsp;</td></tr>\n";
 print "</table>\n";
@@ -1133,8 +1158,12 @@ print <<EOF;
 <tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$colorcommit" width="140">Number of commits</th><th bgcolor="$colorfile" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
+
+# BY DEVELOPERS
+#--------------
+
 foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
     print "<tr><td class=\"aws\">";
     print $key;
@@ -1152,6 +1181,155 @@ foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit
     print "<td>&nbsp;</td>";
     print "</tr>";
 }
+if (scalar keys %nbcommit > 1) {
+    if ($errorstringpie) {
+        print "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
+    }
+    else {
+        my $MAXABS=12;
+        # TODO lmité à 5
+        my $col;
+        # Build graph
+        my $pngfilenbcommit="${PROG}_${Module}_developerscommit.png";
+        my @data = ([keys %nbcommit],[values %nbcommit]);
+        my $graph = GD::Graph::pie->new(160, 138);
+        $col=$color_commit; $col=~s/#//;
+        $graph->set( 
+              title             => 'Number of commits',
+              axislabelclr      => qw(black),
+              textclr           => $color_commit,
+              transparent       => 1,
+              accentclr         => $color_grey,
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (1..$MAXABS) ]
+        ) or die $graph->error;
+        my $gd = $graph->plot(\@data) or die $graph->error;
+        open(IMG, ">$pngfilenbcommit") or die $!;
+        binmode IMG;
+        print IMG $gd->png;
+        close IMG;
+        # End build graph
+        # Build graph
+        my $pngfilefile="${PROG}_${Module}_developersfile.png";
+        my @data = ([keys %nbfile],[values %nbfile]);
+        my $graph = GD::Graph::pie->new(160, 138);
+        $col=$color_file; $col=~s/#//;
+        $graph->set( 
+              title             => 'Different files',
+              axislabelclr      => qw(black),
+              textclr           => $color_file,
+              transparent       => 1,
+              accentclr         => $color_grey,
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (1..$MAXABS) ]
+        ) or die $graph->error;
+        my $gd = $graph->plot(\@data) or die $graph->error;
+        open(IMG, ">$pngfilefile") or die $!;
+        binmode IMG;
+        print IMG $gd->png;
+        close IMG;
+        # End build graph
+        print "<tr><td colspan=\"7\"><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
+    }
+}
+print <<EOF;
+</table></td></tr></table><br />
+
+<br />
+
+<a name="daysofweek">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Activity by days of week</td><td class="aws_blank"></td></tr>
+<tr><td colspan="2">
+<table class="aws_data daysofweek" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+
+# BY DAYS OF WEEK
+#----------------
+
+if ($errorstringbars) {
+    print "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
+}
+else {
+    my @absi=('Mon','Tue','Wed','Thi','Fri','Sat','Sun'); my @ordo=(); my $cumul=0;
+    # We need to build array values for chart
+    foreach my $dateuser (sort keys %DateAuthor) {
+        my ($date,$user)=split(/\s+/,$dateuser);
+        my $dayofweek=&DayOfWeek($date);
+        $ordo[$dayofweek-1]+=$DateAuthor{"$dateuser"};
+    }
+    # Build graph
+    my $pngfile="${PROG}_${Module}_daysofweek.png";
+    my @data = ([@absi],[@ordo]);
+    my $graph = GD::Graph::bars->new(260, 200);
+    $graph->set( 
+          #title             => 'Some simple graph',
+          transparent       => 1,
+          x_label           => 'Days of week', x_label_position =>0.5, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1, x_number_format => "%02d",
+          y_label           => 'Number of commits', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, y_tick_number =>10, #y_number_format   => "%06d",
+          textclr           => $color_commit,
+          boxclr            => $color_lightgrey,
+          fgclr             => $color_grey,
+          dclrs             => [ $color_commit ],
+          accentclr         => "#444444",
+          #borderclrs        => [ qw(blue green pink blue) ],
+    ) or die $graph->error;
+    my $gd = $graph->plot(\@data) or die $graph->error;
+    open(IMG, ">$pngfile") or die $!;
+    binmode IMG;
+    print IMG $gd->png;
+    close IMG;
+    # End build graph
+    print "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+}
+
+print <<EOF;
+</table></td></tr></table><br />
+
+<br />
+<a name="hours">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Activity by hours</td><td class="aws_blank"></td></tr>
+<tr><td colspan="2">
+<table class="aws_data hours" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+
+# BY HOURS
+#---------
+
+if ($errorstringbars) {
+    print "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
+}
+else {
+    my @absi=(0..23); my @ordo=(); my $cumul=0;
+    # We need to build array values for chart
+    foreach my $houruser (sort keys %HourAuthor) {
+        my ($hour,$user)=split(/\s+/,$houruser);
+        $ordo[int($hour)]+=$HourAuthor{"$houruser"};
+    }
+    # Build graph
+    my $pngfile="${PROG}_${Module}_hours.png";
+    my @data = ([@absi],[@ordo]);
+    my $graph = GD::Graph::bars->new(640, 240);
+    $graph->set( 
+          #title             => 'Some simple graph',
+          transparent       => 1,
+          x_label           => 'Hours', x_label_position =>0.5, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1, x_number_format => "%02d",
+          y_label           => 'Number of commits', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, y_tick_number =>10, #y_number_format   => "%06d",
+          textclr           => $color_commit,
+          boxclr            => $color_lightgrey,
+          fgclr             => $color_grey,
+          dclrs             => [ $color_commit ],
+          accentclr         => "#444444",
+          #borderclrs        => [ qw(blue green pink blue) ],
+    ) or die $graph->error;
+    my $gd = $graph->plot(\@data) or die $graph->error;
+    open(IMG, ">$pngfile") or die $!;
+    binmode IMG;
+    print IMG $gd->png;
+    close IMG;
+    # End build graph
+    print "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+}
+
 print <<EOF;
 </table></td></tr></table><br />
 
@@ -1163,6 +1341,10 @@ print <<EOF;
 <tr><td colspan="2">
 <table class="aws_data lastlogs" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
+
+# LASTLOGS
+#---------
+
 my $width=140;
 print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
@@ -1195,15 +1377,19 @@ foreach my $dateuser (reverse sort keys %DateAuthor) {
 		}
         if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
 	}
-    if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
     print "</td></tr>";
+    if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) {
+        my $rest="some"; # TODO put here value of not shown commits
+        print "<tr><td valign=\"top\" colspan=\"3\" align=\"left\">Other commits are hidden...</td></tr>";
+        last;
+    }
 }	
 
 print <<EOF;
 </table></td></tr></table><br />
 EOF
 
-}
+}   # End buildhtmlreport
 
 # Footer
 if ($Output =~ /buildhtmlreport$/) {
