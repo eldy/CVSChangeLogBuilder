@@ -139,9 +139,9 @@ sub LoadDataInMemory {
 	my $newfilename=$filename;
 
 	# Define filelog
-	my $newfilelog="$filelog";
-	$newfilelog =~ s/\n\s*\n/\n/g;					# Remove blank lines
-	$newfilelog =~ s/^\s*[\r\n]*//g;				# Remove starting blank
+	$filelog =~ s/\n\s*\n/\n/g;					# Remove blank lines
+	$filelog =~ s/^\s*[\r\n]*//g;				# Remove starting blank
+	my $newfilelog=ucfirst("$filelog");
 
 	# DEFINE CHANGE STATUS (removed, changed or added) OF FILE
 	my $newfilestate='';
@@ -1570,6 +1570,7 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		chomp $comment;
 		$comment =~ s/\r$//;
 		foreach my $logline (split(/\n/,$comment)) {
+			my 
 			print "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
