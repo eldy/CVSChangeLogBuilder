@@ -284,7 +284,7 @@ sub LoadDataInMemory {
             my $pid = open(PH, "$command 2>&1 |");
             while (<PH>) {
                 #chomp $_; s/\r$//;
-                debug("$_");
+                #debug("$_");
                 if ($_ =~ /cvs \[update aborted\]:/) { $errorstring=$_; $nbline=0; last; }
                 $nbline++;
             }   
@@ -825,7 +825,7 @@ if ($Output =~ /^buildhtmlreport/) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
             debug(" Load cache entry for ($file,$revision)=$nbline",2);
-            $Cache{$file}{$revision}=$nbline;
+            $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
         }
         close CACHE;
     } else {
