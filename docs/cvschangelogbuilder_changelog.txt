@@ -1,0 +1,15 @@
+CVSChangelogBuilder Changelog
+-----------------------------
+$Revision$ - $Author$ - $Date$
+
+
+1.0
+
+- First released version
+
+
+
+
+KNOWN BUGS - TODO
+Fix several reported "removed", keep only last entry as 'removed', others should be 'changed',
+like do the date report.
