@@ -1570,7 +1570,6 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		chomp $comment;
 		$comment =~ s/\r$//;
 		foreach my $logline (split(/\n/,$comment)) {
-			my 
 			print "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
