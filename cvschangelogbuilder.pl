@@ -54,9 +54,10 @@ my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEUSERSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs -f";
-my $COMP="";    # Do no use compression because it seems to return bugged rlog files for some servers/clients.
+my $COMP="";                # Do no use compression because it seems to return bugged rlog files for some servers/clients.
 my $ViewCvsUrl="";
-my $ENABLEREQUESTFORADD=1;
+my $ENABLEREQUESTFORADD=1;  # Allow cvs request to get number of lines for added/removed files.
+my %Ignore=();
 # ---------- Init Regex --------
 use vars qw/ $regclean1 $regclean2 /;
 $regclean1=qr/<(recnb|\/td)>/i;
@@ -116,6 +117,7 @@ sub mkdir_recursive() {
         }
     
         if ($parent && $dir && -d $parent) {
+            debug("Create dir '$parent/dir'",2);
             if (mkdir "$parent/$dir") {
                 push @{$array}, "$parent/$dir";
                 #print STDERR "$parent/$dir\n";
@@ -129,6 +131,7 @@ sub mkdir_recursive() {
         }
     }
     else {
+        debug("Create dir '$mdir'",2);
         if (mkdir "$mdir") {
             push @{$array}, "$mdir";
             #print STDERR "$parent/$dir\n";
@@ -271,7 +274,7 @@ sub LoadDataInMemory {
             # Create dir if not exists
             my @added_dir_to_remove=();
             my @added_files_to_remove=();
-   	        debug("Need to get file $filenametoget $filerevisiontoscan\n",2);
+   	        debug("Need to get file '$filenametoget' $filerevisiontoscan\n",2);
             if ($filenametoget =~ /Attic\//) {
                 my $dir=$filenametoget; $dir =~ s/[\/\\]*[^\/\\]+$//;
                 if ($dir) {
@@ -292,7 +295,8 @@ sub LoadDataInMemory {
                 }
                 $filenametoget =~ s/Attic\///;
             }
-
+            # TODO update with both -p and -d does not work.
+            # Must change to firs run update -d, then update -p -r xxx
 	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -d -r $filerevisiontoscan $filenametoget";
 	        debug("Getting file '$relativefilename' revision '$filerevisiontoscan'\n",3);
 	        debug("with command '$command'\n",3);
@@ -629,6 +633,7 @@ if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
+if ($QueryString =~ /-ignore=([^\s]+)/i)        { $Ignore{$1}=1; }
 ($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
 debug("Module    : $Module");
@@ -710,6 +715,7 @@ if ($Help || ! $Output) {
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
 	writeoutput("                           output are links to \"viewcvs\".\n");
+	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
 	writeoutput("  -debug=x            To get debug info with level x\n");
 	writeoutput("\n");
 	writeoutput("Example:\n");
@@ -858,6 +864,7 @@ if (! $RLogFile) {
 #------------------------
 writeoutput("Analyzing rlog file '$RLogFile'\n",1);
 if ($Output =~ /^buildhtmlreport/) {
+    # Try to read cache file
     my $ModuleForCache=$Module;
     $ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
     my $cachefile="${OutputDir}${PROG}_${ModuleForCache}.cache";
@@ -868,10 +875,8 @@ if ($Output =~ /^buildhtmlreport/) {
         while (<CACHE>) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
-#            if ($nbline ne 'ERROR') {
-                debug(" Load cache entry for ($file,$revision)=$nbline",1);
-                $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
-#            }
+            debug(" Load cache entry for ($file,$revision)=$nbline",1);
+            $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
         }
         close CACHE;
     } else {
@@ -902,10 +907,16 @@ while (<RLOGFILE>) {
 			$filename=$1;
 			$filename =~ s/,v$//g;					# Clean filename if ended with ",v"
 			# We found a new filename
-			$waitfor="symbolic_name";
 			debug("Found a new file '$filename'",2);
-			$maxincludedver{"$filename"}=0;
-			$minexcludedver{"$filename"}=0;
+            if (! $Ignore{$filename}) {
+    			debug("File is qualified to be included in report",2);
+    			$waitfor="symbolic_name";
+	    		$maxincludedver{"$filename"}=0;
+			    $minexcludedver{"$filename"}=0;
+            }
+            else {
+    			debug("File discarded by ignore optione",2);
+            }
 		}
 		next;
 	}
