@@ -26,6 +26,7 @@ my $TagStart='';
 my $TagEnd='';
 my $Module='';
 my $Output='';		# Default will be "listdeltabydate"
+my $OutputDir='';
 my $CvsRoot='';		# Example ":ntserver:127.0.0.1:d:/temp/cvs"
 my $UseSsh=0;
 my $RLogFile;
@@ -180,6 +181,15 @@ sub writeoutput {
     print STDERR $string;
 	0;
 }
+sub writeoutputfile {
+    my $string=shift;
+    if ($OutputDir) {
+        print FILE $string;   
+    } else {
+        print $string;
+    }
+	0;
+}
 
 
 #-------------------------------------------------------
@@ -247,20 +257,24 @@ sub LoadDataInMemory {
 	}
 	# We know state
 	# If added or removed, value for lines added and deleted is not correct, so we download file to count them
-    if ($Output =~ /^buildhtmlreport/ && $newfilestate eq 'added' && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
+    if ($Output =~ /^buildhtmlreport/ && ($newfilestate eq 'added' || $newfilestate eq 'removed') && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
+        my $filerevisiontoscan=$filerevision;
+        if ($newfilestate eq 'removed') { $filerevisiontoscan=DecreaseVersion($filerevisiontoscan); }
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
-        if (! defined $Cache{$relativefilename}{$filerevision}) {
+        if (! defined $Cache{$relativefilename}{$filerevisiontoscan}) {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
             # Create dir if not exists
             my @added_dir_to_remove=();
             my @added_files_to_remove=();
+   	        debug("Need to get file $filenametoget $filerevisiontoscan\n",2);
             if ($filenametoget =~ /Attic\//) {
                 my $dir=$filenametoget; $dir =~ s/[\/\\]*[^\/\\]+$//;
                 if ($dir) {
+                    # Create dir to allow cvs update
                     &mkdir_recursive("$dir/CVS",\@added_dir_to_remove);
                     if (! -f "$dir/CVS/Entries") {
                         push @added_files_to_remove, "$dir/CVS/Entries";
@@ -275,19 +289,22 @@ sub LoadDataInMemory {
                         close(REPOSITORY);
                     }
                 }
+                $filenametoget =~ s/Attic\///;
             }
-            
-	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -d -r $filerevision $filenametoget";
-	        debug("Getting file '$relativefilename' revision '$filerevision'\n",3);
+
+	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -d -r $filerevisiontoscan $filenametoget";
+	        debug("Getting file '$relativefilename' revision '$filerevisiontoscan'\n",3);
 	        debug("with command '$command'\n",3);
             my $errorstring='';
             my $pid = open(PH, "$command 2>&1 |");
             while (<PH>) {
                 #chomp $_; s/\r$//;
                 #debug("$_");
+                if ($_ =~ /cvs \[update aborted\]: no repository/) { $errorstring=$_; $nbline=0; last; }
                 if ($_ =~ /cvs \[update aborted\]:/) { $errorstring=$_; $nbline=0; last; }
                 $nbline++;
             }   
+            # Remove downloaded files and dir
             foreach my $filetodelete (@added_files_to_remove) {
                 #print STDERR "remove file $filetodelete\n";
                 unlink $filetodelete;
@@ -302,16 +319,23 @@ sub LoadDataInMemory {
             else {
                 debug("Nb of line : $nbline",2);
                 # Save result in a cache for other run
-                print CACHE "$relativefilename $filerevision $nbline $fileformat\n";
+                print CACHE "$relativefilename $filerevisiontoscan $nbline $fileformat\n";
             }
             close(PH);
         }
         else {
-            $nbline=$Cache{$relativefilename}{$filerevision};
+            $nbline=$Cache{$relativefilename}{$filerevisiontoscan};
         }
         print STDERR ".";
-        $filechange="+$nbline -0";
-        $filelineadd=$nbline;
+        if ($newfilestate eq 'added') {
+            $filechange="+$nbline -0";
+            $filelineadd=$nbline;
+        }
+        if ($newfilestate eq 'removed') {
+            debug("Nb of line : $nbline $relativefilename $filerevisiontoscan",2);
+            $filechange="+0 -$nbline";
+            $filelinedel=$nbline;
+        }
 	}
 	
 	# All infos were found. We can process record
@@ -592,14 +616,16 @@ if ($QueryString =~ /output=([^\s]+)/i)   		{ $Output=$1; }
 if ($QueryString =~ /branch=([^\s]+)/i)			{ $Branch=$1; }
 if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
+if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
+if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
-if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 ($DIR=$0) =~ s/([^\/\\]*)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 debug("Module    : $Module");
 debug("Output    : $Output");
+debug("OutputDir : $OutputDir");
 debug("ViewCvsUrl: $ViewCvsUrl");
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
@@ -663,17 +689,18 @@ if ($Help || ! $Output) {
 	writeoutput("  -branch=branchname  To work on another branch than default branch (!)\n");
 	writeoutput("  -tagstart=tagname   To specify start tag version\n");
 	writeoutput("  -tagend=tagend      To specify end tag version\n");
-	writeoutput("  -viewcvsurl=viewcvsurl   File revision in output built by buildhtmlreport\n");
-	writeoutput("                           is a link to viewcvs diff page for file\n");
 	writeoutput("\n");
 	writeoutput("  !!! WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n");
 	writeoutput("  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n");
 	writeoutput("  give the name of the branch, otherwise you will get unpredicable result.\n");
 	writeoutput("\n");
 	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
-	writeoutput("  -debug=x            To get debug info with level x\n");
 	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
 	writeoutput("                      this option to save on step, for a faster result.\n");
+	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
+	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
+	writeoutput("                           output are links to \"viewcvs\".\n");
+	writeoutput("  -debug=x            To get debug info with level x\n");
 	writeoutput("\n");
 	writeoutput("Example:\n");
 	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
@@ -731,6 +758,13 @@ if (! $Module) {
 	writeoutput("\n");
 	error("The module name was not provided and could not be detected.\nUse -m=cvsmodulename option to specifiy module name.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 }
+
+# Start of true output
+if ($OutputDir) {
+    $OutputDir.="/";
+    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file ${PROG}_$Module.html for output.");
+}
+
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
 # Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
@@ -829,7 +863,10 @@ if ($Output =~ /^buildhtmlreport/) {
         }
         close CACHE;
     } else {
-        print STDERR "No cache file yet, so it can takes a long time. Please wait...\n";
+        print STDERR "No cache file can found. This probably means you running $PROG for\n";
+        print STDERR "the first time. Building cache for the first update can take a very long\n";
+        print STDERR "time (between several seconds to hours depending on your CVS server response\n";
+        print STDERR "time), so please wait...\n";
     }
     open(CACHE,">>$cachefile") || error("Failed to open cache file '$cachefile' for writing");
 }
@@ -997,16 +1034,16 @@ elsif ($TagEnd) {
 }
 $headstring.="\n built by $PROG $VERSION with option $Output.";
 if ($Output !~ /buildhtmlreport$/) {
-    print "$headstring\n\n";
+    writeoutputfile "$headstring\n\n";
 }
 else {
-    print "<html>\n<head>\n";
-    print "<meta name=\"generator\" content=\"$PROG $VERSION\" />\n";
-    print "<meta name=\"robots\" content=\"noindex,nofollow\" />\n";
-    print "<meta http-equiv=\"content-type\" content=\"text/html; charset=iso-8859-1\" />\n";
-    print "<meta http-equiv=\"description\" content=\"$headstring\" />\n";
-    print "<title>CVS report for $Module</title>\n";
-    print <<EOF;
+    writeoutputfile "<html>\n<head>\n";
+    writeoutputfile "<meta name=\"generator\" content=\"$PROG $VERSION\" />\n";
+    writeoutputfile "<meta name=\"robots\" content=\"noindex,nofollow\" />\n";
+    writeoutputfile "<meta http-equiv=\"content-type\" content=\"text/html; charset=iso-8859-1\" />\n";
+    writeoutputfile "<meta http-equiv=\"description\" content=\"$headstring\" />\n";
+    writeoutputfile "<title>CVS report for $Module</title>\n";
+    writeoutputfile <<EOF;
 <style type="text/css">
 <!--
 body { font: 11px verdana, arial, helvetica, sans-serif; background-color: #FFFFFF; margin-top: 0; margin-bottom: 0; }
@@ -1043,8 +1080,8 @@ div { font: 12px 'Arial','Verdana','Helvetica', sans-serif; text-align: justify;
 //-->
 </style>
 EOF
-    print "</head>\n";
-    print "<body>\n";
+    writeoutputfile "</head>\n";
+    writeoutputfile "<body>\n";
 }
 
 # For output by date
@@ -1059,30 +1096,30 @@ if ($Output =~ /bydate$/ || $Output =~ /forrpm$/) {
 					if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 					if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 					if (! $firstlineprinted) {
-						if ($Output =~ /forrpm$/) { print "* ".FormatDate($dateuser,'rpm')."\n"; }
-						else { print FormatDate($dateuser)."\n"; }
+						if ($Output =~ /forrpm$/) { writeoutputfile "* ".FormatDate($dateuser,'rpm')."\n"; }
+						else { writeoutputfile FormatDate($dateuser)."\n"; }
 						$firstlineprinted=1;
 					}
 					my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$revision};
 					$state =~ s/_forced//;
 					if ($Output !~ /forrpm$/) {
-						print "\t* ".ExcludeRepositoryFromPath($file)." $version ($state):\n";
+						writeoutputfile "\t* ".ExcludeRepositoryFromPath($file)." $version ($state):\n";
 					}
 				}
 				chomp $logcomment;
 				$logcomment =~ s/\r$//;
 				if ($firstlineprinted) {
 					foreach my $logline (split(/\n/,$logcomment)) {
-						if ($Output =~ /forrpm$/) { print "\t- $logline\n"; }
-						else { print "\t\t$logline\n"; }
+						if ($Output =~ /forrpm$/) { writeoutputfile "\t- $logline\n"; }
+						else { writeoutputfile "\t\t$logline\n"; }
 					}
 				}
 			}
-			if ($firstlineprinted) { print "\n"; }
+			if ($firstlineprinted) { writeoutputfile "\n"; }
 		}	
 	}
 	else {
-		print "No change detected.\n";	
+		writeoutputfile "No change detected.\n";	
 	}
 }
 
@@ -1096,24 +1133,24 @@ if ($Output =~ /byfile$/) {
 				if ($maxincludedver{"$file"} && (CompareVersionBis($version,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $version > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 				if ($minexcludedver{"$file"} && (CompareVersionBis($version,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $version <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 				if (! $firstlineprinted) {
-					print ExcludeRepositoryFromPath($file)."\n";
+					writeoutputfile ExcludeRepositoryFromPath($file)."\n";
 					$firstlineprinted=1;
 				}
-				printf ("\t* %-16s ",$version." (".$FilesChangeState{$file}{$version}.")");
-				print FormatDate($FilesChangeDate{$file}{$version})."\t$FilesChangeUser{$file}{$version}\n";
+				writeoutput sprintf ("\t* %-16s ",$version." (".$FilesChangeState{$file}{$version}.")");
+				writeoutputfile FormatDate($FilesChangeDate{$file}{$version})."\t$FilesChangeUser{$file}{$version}\n";
 				my $logcomment=$FilesChangeLog{$file}{$version};
 				chomp $logcomment;
 				$logcomment =~ s/\r$//;
 				if ($firstlineprinted) {
 					foreach my $logline (split(/\n/,$logcomment)) {
-						print "\t\t$logline\n";
+						writeoutputfile "\t\t$logline\n";
 					}
 				}
 			}
 		}	
 	}
 	else {
-		print "No change detected.\n";	
+		writeoutputfile "No change detected.\n";	
 	}
 }
 
@@ -1130,24 +1167,24 @@ if ($Output =~ /bylog$/) {
 				if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 				if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 				if (! $firstlineprinted) {
-					print "$newlogcomment\n";
+					writeoutputfile "$newlogcomment\n";
 					$firstlineprinted=1;
 				}
 				$file=ExcludeRepositoryFromPath($file);
-				print "\t* ".FormatDate($LogChangeDate{$logcomment}{$revision})." $LogChangeUser{$logcomment}{$revision}\t $file $version ($LogChangeState{$logcomment}{$revision})\n";
+				writeoutputfile "\t* ".FormatDate($LogChangeDate{$logcomment}{$revision})." $LogChangeUser{$logcomment}{$revision}\t $file $version ($LogChangeState{$logcomment}{$revision})\n";
 			}
-			if ($firstlineprinted) { print "\n"; }
+			if ($firstlineprinted) { writeoutputfile "\n"; }
 		}	
 	}
 	else {
-		print "No change detected.\n";	
+		writeoutputfile "No change detected.\n";	
 	}
 }
 
 
 # For building html report
 if ($Output =~ /buildhtmlreport$/) {
-    writeoutput("Generating HTML report...\n");
+    writeoutput("Generating HTML report...\n",1);
 
     my ($errorstringlines,$errorstringpie,$errorstringbars)=();
     if (!eval ('require "GD/Graph/lines.pm";')) { 
@@ -1301,7 +1338,7 @@ if ($Output =~ /buildhtmlreport$/) {
     until ($cursor > $maxyearmonth);
 
     
-print <<EOF;
+writeoutputfile <<EOF;
 
 <a name="menu">&nbsp;</a>
 <table border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1311,24 +1348,20 @@ print <<EOF;
 </table>
 </td></tr></table>
 <br />
-EOF
 
-    print "<font color=red>Warning: In this version, lines of code for files that were completely removed from repository are not yet substracted. That's why, if you removed a lot of file, the 'Lines of code' information is for the moment higher than truth.</font><br><br>";
-
-print <<EOF;
 <a name="parameters">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0">
-<tr><td class="aws_title" width="70%">Analysis' parameters</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td class="aws_title" width="70%">CVS analysis' parameters</td><td class="aws_blank">&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data parameters" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
 
-print "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
-print "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS root used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
-print "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
-print "<tr><td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS root used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 
 <a name="summary">&nbsp;</a><br />
@@ -1338,58 +1371,58 @@ print <<EOF;
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
 
-print "<tr bgcolor=\"#FFF0E0\"><th colspan=\"2\">Current status indicators</th><th width=\"180\">Value</th><th width=\"180\">&nbsp;</th><th width=\"180\">&nbsp;</th></tr>\n";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th colspan=\"2\">Current status indicators</th><th width=\"180\">Value</th><th width=\"180\">&nbsp;</th><th width=\"180\">&nbsp;</th></tr>\n";
 
-print "<tr><td class=\"aws\">Files currently in repository</td><td bgcolor=\"$color_file\" width=\"10\">&nbsp;</td>";
-print "<td width=\"180\" align=\"center\">".($TotalFile>0?"<b>$TotalFile</b>":"0")."</td>";
-print "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Files currently in repository</td><td bgcolor=\"$color_file\" width=\"10\">&nbsp;</td>";
+writeoutputfile "<td width=\"180\" align=\"center\">".($TotalFile>0?"<b>$TotalFile</b>":"0")."</td>";
+writeoutputfile "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
+writeoutputfile "</tr>\n";
 
-print "<tr><td class=\"aws\">Lines of code currently in repository (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
-print "<td width=\"180\">".($TotalLine>0?"<b>$TotalLine</b>":"0")."</td>";
-print "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Lines of code currently in repository (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
+writeoutputfile "<td width=\"180\">".($TotalLine>0?"<b>$TotalLine</b>":"0")."</td>";
+writeoutputfile "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
+writeoutputfile "</tr>\n";
 
 
-print "<tr bgcolor=\"#FFF0E0\"><th width=\"200\" colspan=\"2\">Activity indicators</th><th width=\"180\">From start</th><th width=\"180\">This month</th><th width=\"180\">Today</th></tr>\n";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"200\" colspan=\"2\">Activity indicators</th><th width=\"180\">From start</th><th width=\"180\">This month</th><th width=\"180\">Today</th></tr>\n";
 
-print "<tr><td class=\"aws\">Number of developers</td><td bgcolor=\"$color_user\" width=\"10\">&nbsp;</td>";
-print "<td width=\"180\">".(scalar keys %TotalUser?"<b>".(scalar keys %TotalUser)."</b>":"0")."</td>";
-print "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>".(scalar keys %TotalUserMonth)."</b>":"0")."</td>";
-print "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Number of developers</td><td bgcolor=\"$color_user\" width=\"10\">&nbsp;</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUser?"<b>".(scalar keys %TotalUser)."</b>":"0")."</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>".(scalar keys %TotalUserMonth)."</b>":"0")."</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
+writeoutputfile "</tr>\n";
 
-print "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\"></td>";
-print "<td>".($TotalCommit?"<b>$TotalCommit</b>":"0")."</td>";
-print "<td>".($TotalCommitMonth?"<b>$TotalCommitMonth</b>":"0")."</td>";
-print "<td>".($TotalCommitDay?"<b>$TotalCommitDay</b>":"0")."</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\"></td>";
+writeoutputfile "<td>".($TotalCommit?"<b>$TotalCommit</b>":"0")."</td>";
+writeoutputfile "<td>".($TotalCommitMonth?"<b>$TotalCommitMonth</b>":"0")."</td>";
+writeoutputfile "<td>".($TotalCommitDay?"<b>$TotalCommitDay</b>":"0")."</td>";
+writeoutputfile "</tr>\n";
 
-print "<tr><td class=\"aws\" valign=\"top\">Number of commits by status</td><td bgcolor=\"$color_commit2\" class=\"aws\">&nbsp;</td>";
-print "<td valign=\"top\">".($TotalCommitByState{'added'}?"<b>$TotalCommitByState{'added'}</b> to add new file<br>":"").($TotalCommitByState{'changed'}?"<b>$TotalCommitByState{'changed'}</b> to change existing file<br>":"").($TotalCommitByState{'removed'}?"<b>$TotalCommitByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
-print "<td valign=\"top\">".($TotalCommitMonthByState{'added'}?"<b>$TotalCommitMonthByState{'added'}</b> to add new file<br>":"").($TotalCommitMonthByState{'changed'}?"<b>$TotalCommitMonthByState{'changed'}</b> to change existing file<br>":"").($TotalCommitMonthByState{'removed'}?"<b>$TotalCommitMonthByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
-print "<td valign=\"top\">".($TotalCommitDayByState{'added'}?"<b>$TotalCommitDayByState{'added'}</b> to add new file<br>":"").($TotalCommitDayByState{'changed'}?"<b>$TotalCommitDayByState{'changed'}</b> to change existing file<br>":"").($TotalCommitDayByState{'removed'}?"<b>$TotalCommitDayByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\" valign=\"top\">Number of commits by status</td><td bgcolor=\"$color_commit2\" class=\"aws\">&nbsp;</td>";
+writeoutputfile "<td valign=\"top\">".($TotalCommitByState{'added'}?"<b>$TotalCommitByState{'added'}</b> to add new file<br>":"").($TotalCommitByState{'changed'}?"<b>$TotalCommitByState{'changed'}</b> to change existing file<br>":"").($TotalCommitByState{'removed'}?"<b>$TotalCommitByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
+writeoutputfile "<td valign=\"top\">".($TotalCommitMonthByState{'added'}?"<b>$TotalCommitMonthByState{'added'}</b> to add new file<br>":"").($TotalCommitMonthByState{'changed'}?"<b>$TotalCommitMonthByState{'changed'}</b> to change existing file<br>":"").($TotalCommitMonthByState{'removed'}?"<b>$TotalCommitMonthByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
+writeoutputfile "<td valign=\"top\">".($TotalCommitDayByState{'added'}?"<b>$TotalCommitDayByState{'added'}</b> to add new file<br>":"").($TotalCommitDayByState{'changed'}?"<b>$TotalCommitDayByState{'changed'}</b> to change existing file<br>":"").($TotalCommitDayByState{'removed'}?"<b>$TotalCommitDayByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
+writeoutputfile "</tr>\n";
 
-print "<tr><td class=\"aws\">Different files commited</td><td bgcolor=\"$color_file\">&nbsp;</td>";
-print "<td>".(scalar keys %TotalFile?"<b>".(scalar keys %TotalFile)."</b>":"0")."</td>";
-print "<td>".(scalar keys %TotalFileMonth?"<b>".(scalar keys %TotalFileMonth)."</b>":"0")."</td>";
-print "<td>".(scalar keys %TotalFileDay?"<b>".(scalar keys %TotalFileDay)."</b>":"0")."</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Different files commited</td><td bgcolor=\"$color_file\">&nbsp;</td>";
+writeoutputfile "<td>".(scalar keys %TotalFile?"<b>".(scalar keys %TotalFile)."</b>":"0")."</td>";
+writeoutputfile "<td>".(scalar keys %TotalFileMonth?"<b>".(scalar keys %TotalFileMonth)."</b>":"0")."</td>";
+writeoutputfile "<td>".(scalar keys %TotalFileDay?"<b>".(scalar keys %TotalFileDay)."</b>":"0")."</td>";
+writeoutputfile "</tr>\n";
 
-print "<tr><td class=\"aws\">Lines added / modified / removed (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
-print "<td width=\"180\">".(scalar keys %TotalUser?"<b>":"")."+$TotalLineByState{'added'} / $TotalLineByState{'changed'} / $TotalLineByState{'removed'}".(scalar keys %TotalUser?"</b>":"")."</td>";
-print "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>":"")."+$TotalLineMonthByState{'added'} / $TotalLineMonthByState{'changed'} / $TotalLineMonthByState{'removed'}".(scalar keys %TotalUserMonth?"</b>":"")."</td>";
-print "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>":"")."+$TotalLineDayByState{'added'} / $TotalLineDayByState{'changed'} / $TotalLineDayByState{'removed'}".(scalar keys %TotalUserDay?"</b>":"")."</td>";
-print "</tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Lines added / modified / removed (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUser?"<b>":"")."+$TotalLineByState{'added'} / $TotalLineByState{'changed'} / $TotalLineByState{'removed'}".(scalar keys %TotalUser?"</b>":"")."</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>":"")."+$TotalLineMonthByState{'added'} / $TotalLineMonthByState{'changed'} / $TotalLineMonthByState{'removed'}".(scalar keys %TotalUserMonth?"</b>":"")."</td>";
+writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>":"")."+$TotalLineDayByState{'added'} / $TotalLineDayByState{'changed'} / $TotalLineDayByState{'removed'}".(scalar keys %TotalUserDay?"</b>":"")."</td>";
+writeoutputfile "</tr>\n";
 
 # Last commit
 my $pos=1;
 if ($LastCommitDate >= int("$nowyear${nowmonth}01")) { $pos=2; }
 if ($LastCommitDate >= int("$nowyear$nowmonth$nowday")) { $pos=3; }
-print "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last\">&nbsp;</td><td><b>".($pos>=1?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=2?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=3?FormatDate($LastCommitDate):"&nbsp;")."</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last\">&nbsp;</td><td><b>".($pos>=1?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=2?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=3?FormatDate($LastCommitDate):"&nbsp;")."</b></td></tr>\n";
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 
 <a name="linesofcode">&nbsp;</a><br />
@@ -1405,12 +1438,12 @@ EOF
 # LINES OF CODE
 #--------------
 
-print "<table>";
-print "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
-print "<tr><td>&nbsp;</td>";
+writeoutputfile "<table>";
+writeoutputfile "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
+writeoutputfile "<tr><td>&nbsp;</td>";
 # Build chart
 if ($errorstringlines) {
-    print "<td>Perl module GD::Graph::lines must be installed to get charts</td>";   
+    writeoutputfile "<td>Perl module GD::Graph::lines must be installed to get charts</td>";   
 }
 else {
     # Build graph
@@ -1429,17 +1462,17 @@ else {
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
     my $gd = $graph->plot(\@data) or die $graph->error;
-    open(IMG, ">$pngfile") or die $!;
+    open(IMG, ">${OutputDir}$pngfile") or die $!;
     binmode IMG;
     print IMG $gd->png;
     close IMG;
     # End build graph
-    print "<td><img src=\"$pngfile\" border=\"0\"></td>";
+    writeoutputfile "<td><img src=\"$pngfile\" border=\"0\"></td>";
 }
-print "<td>&nbsp;</td></tr>\n";
-print "</table>\n";
+writeoutputfile "<td>&nbsp;</td></tr>\n";
+writeoutputfile "</table>\n";
 
-print <<EOF;
+writeoutputfile <<EOF;
 </center>
 </td></tr></table></td></tr></table><br />
 
@@ -1455,25 +1488,25 @@ EOF
 #--------------
 
 foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
-    print "<tr><td class=\"aws\">";
-    print $developer;
-    print "</td><td>";
-    print $nbcommit{$developer};
-    print "</td><td>";
-    print $nbfile{$developer};
-    print "</td><td>";
-    print $UserChangeLineAdd{$developer}." / ".$UserChangeLineChange{$developer}." / ".$UserChangeLineDel{$developer};
-    print "</td><td>";
-    print RoundNumber($UserChangeLineAdd{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineChange{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineDel{$developer}/$nbcommit{$developer},1);
-    print "</td><td>";
-    print FormatDate($UserChangeLast{$developer},'simple');
-    print "</td>";
-    print "<td>&nbsp;</td>";
-    print "</tr>";
+    writeoutputfile "<tr><td class=\"aws\">";
+    writeoutputfile $developer;
+    writeoutputfile "</td><td>";
+    writeoutputfile $nbcommit{$developer};
+    writeoutputfile "</td><td>";
+    writeoutputfile $nbfile{$developer};
+    writeoutputfile "</td><td>";
+    writeoutputfile $UserChangeLineAdd{$developer}." / ".$UserChangeLineChange{$developer}." / ".$UserChangeLineDel{$developer};
+    writeoutputfile "</td><td>";
+    writeoutputfile RoundNumber($UserChangeLineAdd{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineChange{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineDel{$developer}/$nbcommit{$developer},1);
+    writeoutputfile "</td><td>";
+    writeoutputfile FormatDate($UserChangeLast{$developer},'simple');
+    writeoutputfile "</td>";
+    writeoutputfile "<td>&nbsp;</td>";
+    writeoutputfile "</tr>";
 }
 if (scalar keys %nbcommit > 1) {
     if ($errorstringpie) {
-        print "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
+        writeoutputfile "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
     }
     else {
         my $MAXABS=12;
@@ -1493,7 +1526,7 @@ if (scalar keys %nbcommit > 1) {
               dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (0..($MAXABS-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
-        open(IMG, ">$pngfilenbcommit") or die $!;
+        open(IMG, ">${OutputDir}$pngfilenbcommit") or die $!;
         binmode IMG;
         print IMG $gd->png;
         close IMG;
@@ -1512,12 +1545,12 @@ if (scalar keys %nbcommit > 1) {
               dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
-        open(IMG, ">$pngfilefile") or die $!;
+        open(IMG, ">${OutputDir}$pngfilefile") or die $!;
         binmode IMG;
         print IMG $gd->png;
         close IMG;
         # End build graph
-        print "<tr><td colspan=\"7\"><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
+        writeoutputfile "<tr><td colspan=\"7\"><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
     }
 }
 
@@ -1545,7 +1578,7 @@ if (scalar keys %nbcommit > 1) {
 #        # End build graph
 #        print "<tr><td colspan=\"7\"><img src=\"$pngfile\" border=\"0\"></td></tr>\n";
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 
 <a name="daysofweek">&nbsp;</a><br />
@@ -1559,7 +1592,7 @@ EOF
 #----------------
 
 if ($errorstringbars) {
-    print "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
+    writeoutputfile "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
 }
 else {
     my @absi=('Mon','Tue','Wed','Thi','Fri','Sat','Sun'); my @ordo=(); my $cumul=0;
@@ -1586,15 +1619,15 @@ else {
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
     my $gd = $graph->plot(\@data) or die $graph->error;
-    open(IMG, ">$pngfile") or die $!;
+    open(IMG, ">${OutputDir}$pngfile") or die $!;
     binmode IMG;
     print IMG $gd->png;
     close IMG;
     # End build graph
-    print "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+    writeoutputfile "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
 }
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 
 <a name="hours">&nbsp;</a><br />
@@ -1608,7 +1641,7 @@ EOF
 #---------
 
 if ($errorstringbars) {
-    print "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
+    writeoutputfile "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
 }
 else {
     my @absi=(0..23); my @ordo=(); my $cumul=0;
@@ -1634,15 +1667,15 @@ else {
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
     my $gd = $graph->plot(\@data) or die $graph->error;
-    open(IMG, ">$pngfile") or die $!;
+    open(IMG, ">${OutputDir}$pngfile") or die $!;
     binmode IMG;
     print IMG $gd->png;
     close IMG;
     # End build graph
-    print "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+    writeoutputfile "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
 }
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 
 <a name="lastlogs">&nbsp;</a><br />
@@ -1656,20 +1689,20 @@ EOF
 #---------
 
 my $width=140;
-print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
 foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
-    print "<tr><td valign=\"top\">".FormatDate($date)."</td>";
-    print "<td valign=\"top\">".$user."</td>";
-    print "<td class=\"aws\">";
+    writeoutputfile "<tr><td valign=\"top\">".FormatDate($date)."</td>";
+    writeoutputfile "<td valign=\"top\">".$user."</td>";
+    writeoutputfile "<td class=\"aws\">";
 	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
         $cursor++;
         my $comment=$logcomment;
 		chomp $comment;
 		$comment =~ s/\r$//;
 		foreach my $logline (split(/\n/,$comment)) {
-			print "<b>".CleanFromTags($logline)."</b><br>\n";
+			writeoutputfile "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
 			$filerevision=~/(.*)\s([\d\.]+)/;
@@ -1679,28 +1712,28 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
 			$state =~ s/_forced//;
 			my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
-			print "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
-			print ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
-			print ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
-			print ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
+			writeoutputfile ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+			writeoutputfile ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+			writeoutputfile ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
             if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
                 if ($state eq 'changed') {
-			        print ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
+			        writeoutputfile ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
 			    }
             }
-			print ")<br>\n";
+			writeoutputfile ")<br>\n";
 		}
         if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
 	}
-    print "</td></tr>";
+    writeoutputfile "</td></tr>";
     if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) {
         my $rest="some"; # TODO put here value of not shown commits
-        print "<tr><td valign=\"top\" colspan=\"3\" align=\"left\">Other commits are hidden...</td></tr>";
+        writeoutputfile "<tr><td valign=\"top\" colspan=\"3\" align=\"left\">Other commits are hidden...</td></tr>";
         last;
     }
 }	
 
-print <<EOF;
+writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
 
@@ -1708,13 +1741,18 @@ EOF
 
 # Footer
 if ($Output =~ /buildhtmlreport$/) {
-    print "<br />\n";
-	print "<b><a href=\"http://cvschangelogb.sourceforge.net\" target=\"awstatshome\">Created by $PROG $VERSION</a></b>";
-    print "<br />\n";
-	print "<br />\n";
-	print "</body>\n</html>\n";
+    writeoutputfile "<br />\n";
+	writeoutputfile "<b><a href=\"http://cvschangelogb.sourceforge.net\" target=\"awstatshome\">Created by $PROG $VERSION</a></b>";
+    writeoutputfile "<br />\n";
+	writeoutputfile "<br />\n";
+	writeoutputfile "</body>\n</html>\n";
 }
 
+
+# Start of true output
+if ($OutputDir) {
+    close FILE;
+}
 
 print STDERR ucfirst($PROG)." finished successfully.\n";
 
