@@ -30,7 +30,7 @@ my $OutputDir='';
 my $CvsRoot='';		# Example ":ntserver:127.0.0.1:d:/temp/cvs"
 my $UseSsh=0;
 my $RLogFile;
-my $NoDelRLogFile=0;
+my $KeepRlogFile=0;
 my $RepositoryPath;
 my $nowtime = my $nowweekofmonth = my $nowdaymod = my $nowsmallyear = 0; 
 my $nowsec = my $nowmin = my $nowhour = my $nowday = my $nowmonth = my $nowyear = my $nowwday = 0;
@@ -624,7 +624,7 @@ if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
-if ($QueryString =~ /nodelrlogfile/i)           { $NoDelRLogFile=1; }
+if ($QueryString =~ /keeprlogfile/i)            { $KeepRlogFile=1; }
 if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
@@ -705,7 +705,7 @@ if ($Help || ! $Output) {
 	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
 	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
 	writeoutput("                       this option to avoid log download, for a faster result.\n");
-	writeoutput("  -nodelrlogfile      Once process is finished, you can ask to not remove the\n");
+	writeoutput("  -keeprlogfile       Once process is finished, you can ask to not remove the\n");
 	writeoutput("                       downloaded log file.\n");
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
@@ -1491,6 +1491,10 @@ else {
           dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
+#    # Defini la légende
+#    $graph->set_legend(("All developers"));
+#    $graph->set_legend_font("");
+#    $graph->set(legend_placement=>'Right');
     my $gd = $graph->plot(\@data) or die $graph->error;
     open(IMG, ">${OutputDir}$pngfile") or die $!;
     binmode IMG;
@@ -1595,6 +1599,7 @@ if (scalar keys %nbcommit > 0) {
 
         my $maxordo=0;
         my @data = ();
+        my @legend = ();
         #my @absi = ();
         push @data, [@absi];
         my $numdev=0;
@@ -1607,11 +1612,12 @@ if (scalar keys %nbcommit > 0) {
                 if ($val > $maxordo) { $maxordo=$val; }
             }
             push @data, [@{$ordonbcommituser{$developer}}];
+            push @legend, ucfirst($developer);
         }
         # We level value for maxordo;
         $maxordo=int($maxordo*1.05+1);
     
-        my $graph = GD::Graph::lines->new(640, 240);
+        my $graph = GD::Graph::lines->new(640+40, 240);
         $graph->set( 
               #title             => 'Some simple graph',
               transparent       => 1,
@@ -1624,6 +1630,10 @@ if (scalar keys %nbcommit > 0) {
 #              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
               #borderclrs        => [ qw(blue green pink blue) ],
         ) or die $graph->error;
+        # Defini la légende
+        $graph->set_legend(@legend);
+        $graph->set_legend_font("");
+        $graph->set(legend_placement=>'Right');
         my $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">${OutputDir}$pngfile") or die $!;
         binmode IMG;
@@ -1809,7 +1819,7 @@ if ($OutputDir) {
     close FILE;
 }
 
-if (! $NoDelRLogFile) {
+if (! $KeepRlogFile) {
     writeoutput("Remove temporary rlog file\n",1);
     unlink "$RLogFile";
 }
