@@ -4,9 +4,12 @@ $Revision$ - $Author$ - $Date$
 
 2.0
 
-- Added an option to build an HTML report of CVS activity: By authors, list commit logs, ...
+- New: Added an option to build an HTML report of CVS activity: By authors, list commit logs, ...
+- New: Autodetect value for module name and repository if in a repository dir.
+- New: Added activity by days of week
+- New: Added activity by hours
+- New: Added pie chart for activity by developers.
 - Updated logo.
-- Autodetect value for module name and repository if in a repository dir.
 
 
 1.0
