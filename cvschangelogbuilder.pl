@@ -1613,7 +1613,7 @@ if (scalar keys %nbcommit > 0) {
               boxclr            => $color_lightgrey,
               fgclr             => $color_grey,
 #              line_types        => [1, 2, 3],
-              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
+#              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
               #borderclrs        => [ qw(blue green pink blue) ],
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
