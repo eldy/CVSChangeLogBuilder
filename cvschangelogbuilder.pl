@@ -52,7 +52,7 @@ my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs";
-my $COMP="-z 6";
+my $COMP="";    # Do no use compression because returned bugged rlog files for some servers/clients.
 my $ViewCvsUrl="";
 my $ENABLEREQUESTFORADD=1;
 # ---------- Init Regex --------
@@ -613,7 +613,7 @@ if ($UseSsh) {
 # LAUNCH CVS COMMAND RLOG TO WRITE RLOGFILE
 #------------------------------------------
 if (! $RLogFile) {
-    print STDERR "No log file yet, so please wait...\n";
+    print STDERR "Need to download cvs log file, please wait...\n";
 	# Define temporary file
 	my $TmpDir="";
 	$TmpDir||=$ENV{"TMP"};
