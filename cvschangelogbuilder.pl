@@ -352,7 +352,7 @@ sub FormatDiffLink {
 	my $url=shift;
 	my $version=shift;
     my $string='';
-    if ($ViewCvsUrl) { $string="$ViewCvsUrl/$Module"; }
+    if ($ViewCvsUrl) { $string="$ViewCvsUrl$Module/"; }
     $string.="$url";
     if ($ViewCvsUrl) { 
         if (CompareVersionBis($version,"1.1")>0) {
