@@ -30,6 +30,7 @@ my $OutputDir='';
 my $CvsRoot='';		# Example ":ntserver:127.0.0.1:d:/temp/cvs"
 my $UseSsh=0;
 my $RLogFile;
+my $NoDelRLogFile=0;
 my $RepositoryPath;
 my $nowtime = my $nowweekofmonth = my $nowdaymod = my $nowsmallyear = 0; 
 my $nowsec = my $nowmin = my $nowhour = my $nowday = my $nowmonth = my $nowyear = my $nowwday = 0;
@@ -623,6 +624,7 @@ if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
+if ($QueryString =~ /nodelrlogfile/i)           { $NoDelRLogFile=1; }
 if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
@@ -702,7 +704,9 @@ if ($Help || ! $Output) {
 	writeoutput("\n");
 	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
 	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
-	writeoutput("                      this option to save on step, for a faster result.\n");
+	writeoutput("                       this option to avoid log download, for a faster result.\n");
+	writeoutput("  -nodelrlogfile      Once process is finished, you can ask to not remove the\n");
+	writeoutput("                       downloaded log file.\n";
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
 	writeoutput("                           output are links to \"viewcvs\".\n");
@@ -1803,6 +1807,11 @@ if ($Output =~ /buildhtmlreport$/) {
 # Start of true output
 if ($OutputDir) {
     close FILE;
+}
+
+if (! $NoDelRLogFile) {
+    writeoutput("Remove temporary rlog file\n",1);
+    unlink "$RLogFile";
 }
 
 print STDERR ucfirst($PROG)." finished successfully.\n";
