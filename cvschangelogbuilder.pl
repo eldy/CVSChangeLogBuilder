@@ -769,12 +769,6 @@ if (! $Module) {
 	error("The module name was not provided and could not be detected.\nUse -m=cvsmodulename option to specifiy module name.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 }
 
-# Start of true output
-if ($OutputDir) {
-    $OutputDir.="/";
-    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file '${PROG}_$Module.html' for output in directory '${OutputDir}'.");
-}
-
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
 # Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
@@ -850,7 +844,7 @@ if (! $RLogFile) {
 	my $result=`$command 2>&1`;
 	print TEMPFILE "$result";
 	close TEMPFILE;
-	if ($result !~ /cvs \w+: Logging/i) {		# With log we get 'cvs server: Logging awstats' and with rlog we get 'cvs rlog: Logging awstats'
+	if (! $result || $result !~ /cvs \w+: Logging/i) {		# With log we get 'cvs server: Logging awstats' and with rlog we get 'cvs rlog: Logging awstats'
 		error("Failure in cvs command: '$command'\n$result");
 	}
 	$RLogFile=$TmpFile;
@@ -1016,9 +1010,15 @@ if ($Output =~ /^buildhtmlreport/) {
 }
 
 
-
 # BUILD OUTPUT
 #------------------------
+
+# Start of true output
+if ($OutputDir) {
+    $OutputDir.="/";
+    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file '${PROG}_$Module.html' for output in directory '${OutputDir}'.");
+}
+
 writeoutput("\nBuild output for option '$Output'\n",1);
 
 # Build header
