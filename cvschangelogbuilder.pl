@@ -13,7 +13,7 @@ use Time::Local;
 # Defines
 #-------------------------------------------------------
 my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
-my $VERSION="2.0 (build $REVISION)";
+my $VERSION="2.1 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd /;
@@ -25,6 +25,7 @@ my $Help='';
 my $TagStart='';
 my $TagEnd='';
 my $Module='';
+my $ModuleForCache='';
 my $Output='';		# Default will be "listdeltabydate"
 my $OutputDir='';
 my $CvsRoot='';		# Example ":ntserver:127.0.0.1:d:/temp/cvs"
@@ -35,6 +36,7 @@ my $RepositoryPath;
 my $nowtime = my $nowweekofmonth = my $nowdaymod = my $nowsmallyear = 0; 
 my $nowsec = my $nowmin = my $nowhour = my $nowday = my $nowmonth = my $nowyear = my $nowwday = 0;
 my $filename='';
+my $fullfilename='';
 my %filesym=();
 my $fileformat='';
 my $filerevision='';
@@ -57,7 +59,9 @@ my $CVSCLIENT="cvs -f";
 my $COMP="";                # Do no use compression because it seems to return bugged rlog files for some servers/clients.
 my $ViewCvsUrl="";
 my $ENABLEREQUESTFORADD=1;  # Allow cvs request to get number of lines for added/removed files.
-my %Ignore=();
+my %IgnoreFileDir=();
+my %OnlyFileDir=();
+my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
 # ---------- Init Regex --------
 use vars qw/ $regclean1 $regclean2 /;
 $regclean1=qr/<(recnb|\/td)>/i;
@@ -92,7 +96,7 @@ my %UserChangeLineAdd=();
 my %UserChangeLineDel=();
 my %UserChangeLineChange=();
 # For html report output
-my $MAXLASTLOG=500;
+my $MAXLASTLOG=200;
 
 
 #------------------------------------------------------------------------------
@@ -117,7 +121,7 @@ sub mkdir_recursive() {
         }
     
         if ($parent && $dir && -d $parent) {
-            debug("Create dir '$parent/dir'",2);
+            debug("Create dir '$parent/$dir'",2);
             if (mkdir "$parent/$dir") {
                 push @{$array}, "$parent/$dir";
                 #print STDERR "$parent/$dir\n";
@@ -203,7 +207,7 @@ sub writeoutputfile {
 sub LoadDataInMemory {
 
 	# Define filename
-	my $newfilename=$filename;
+	my $newfilename=$fullfilename;
 
 	# Define filelog
 	$filelog =~ s/\n\s*\n/\n/g;					# Remove blank lines
@@ -215,14 +219,14 @@ sub LoadDataInMemory {
 	if ($Output =~ /^listdelta/ || $Output =~ /^buildhtmlreport/) {
 		if ($Branch) {
 			# We work in a secondary BRANCH: Change status can't be defined
-			if (!$filesym{$filename}{$Branch}) { return; }		# This entry is not in branch 
+			if (!$filesym{$fullfilename}{$Branch}) { return; }		# This entry is not in branch 
 			$newfilestate="unknown";
 		}
 		else {
 			# We work in main BRANCH
-			if ($TagStart && $filesym{$filename}{$TagStart}) {
+			if ($TagStart && $filesym{$fullfilename}{$TagStart}) {
 				# File did exist at the beginning
-				if ($TagEnd && ! $filesym{$filename}{$TagEnd}) {	# File was removed between TagStart and TagEnd
+				if ($TagEnd && ! $filesym{$fullfilename}{$TagEnd}) {	# File was removed between TagStart and TagEnd
 					$newfilestate="removed";
 				}
 				else {
@@ -236,7 +240,7 @@ sub LoadDataInMemory {
 			}
 			else {
 				# File did not exist for required start
-				if (! $TagEnd || $filesym{$filename}{$TagEnd}) {		# File was added after TagStart (and before TagEnd)
+				if (! $TagEnd || $filesym{$fullfilename}{$TagEnd}) {		# File was added after TagStart (and before TagEnd)
 					# If file contains Attic, this means it was removed so, as it didn't exists in start tag version,
 					# this means we can ignore this file if we need a delta.
 					if ($filename =~ /[\\\/]Attic([\\\/][^\\\/]+)/ && $Output =~ /^listdelta/) { return; }
@@ -265,8 +269,8 @@ sub LoadDataInMemory {
         my $filerevisiontoscan=$filerevision;
         if ($newfilestate eq 'removed') { $filerevisiontoscan=DecreaseVersion($filerevisiontoscan); }
         my $nbline=0;
-	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
-	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
+	    my $relativefilename=ExcludeRepositoryFromPath("$fullfilename",0,1);
+	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$fullfilename",1,1);
         if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR/) {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
@@ -276,16 +280,20 @@ sub LoadDataInMemory {
             my @added_files_to_remove=();
    	        debug("Need to get file '$filenametoget' $filerevisiontoscan\n",2);
             if ($filenametoget =~ /Attic\//) {
-                my $dir=$filenametoget; $dir =~ s/[\/\\]*[^\/\\]+$//;
+                my $dir=$filenametoget;
+                #$dir =~ s/^[^\@]+\@//;
+                $dir =~ s/[\/\\]*[^\/\\]+$//;
                 if ($dir) {
                     # Create dir to allow cvs update
                     &mkdir_recursive("$dir/CVS",\@added_dir_to_remove);
                     if (! -f "$dir/CVS/Entries") {
+                        debug("Create file '$dir/CVS/Entries'",2);
                         push @added_files_to_remove, "$dir/CVS/Entries";
                         open(ENTRIESFILE,">$dir/CVS/Entries");
                         close(ENTRIESFILE);
                     }
                     if (! -f "$dir/CVS/Repository") {
+                        debug("Create file '$dir/CVS/Repository'",2);
                         push @added_files_to_remove, "$dir/CVS/Repository";
                 	    my $relativepath=$relativefilename; $relativepath =~ s/[\\\/][^\/\\]+$//;
                         open(REPOSITORY,">$dir/CVS/Repository");
@@ -311,11 +319,11 @@ sub LoadDataInMemory {
             }   
             # Remove downloaded files and dir
             foreach my $filetodelete (@added_files_to_remove) {
-                #print STDERR "remove file $filetodelete\n";
+                debug("Remove file '$filetodelete'",2);
                 unlink $filetodelete;
             }
             foreach my $dirtodelete (reverse @added_dir_to_remove) {
-                #print STDERR "remove dir $dirtodelete\n";
+                debug("Remove dir '$dirtodelete'",2);
                 rmdir $dirtodelete;
             }
             if ($errorstring) { 
@@ -417,7 +425,7 @@ sub LoadDataInMemory {
 	
 	if ($Output =~ /^buildhtmlreport/) {
 	    if (! $UserChangeLast{$fileuser} || int($UserChangeLast{$fileuser}) < int($filedate)) { $UserChangeLast{$fileuser}=$filedate; }
-	    $UserChangeCommit{$fileuser}{$filename}++;
+	    $UserChangeCommit{$fileuser}{$fullfilename}++;
 	    if ($fileformat ne 'b') {
 	        $UserChangeLineAdd{$fileuser}+=$filelineadd;
 	        $UserChangeLineDel{$fileuser}+=$filelinedel;
@@ -584,14 +592,19 @@ sub DecreaseVersion {
 
 #------------------------------------------------------------------------------
 # Function:      Remove repository path from a full path
-# Input:         a string path
+# Input:         string keepattic removemodule
 # Output:        a string path
 #------------------------------------------------------------------------------
 sub ExcludeRepositoryFromPath {
 	my $file=shift;
 	my $keepattic=shift;
+	my $removemodule=shift;
 	if (! $keepattic) { $file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/; }
-	$file =~ s/^(\w:)?$RepositoryPath[\\\/]$Module[\\\/]//;		# Extract path of repository
+	if ($removemodule) {
+		$file =~ s/^$ModuleForCache\@//;											# Remove Module name
+	}
+	$file =~ s/^($ModuleForCache\@)(\w:)?$RepositoryPath[\\\/]$Module[\\\/]/$1/;	# Remove path repository
+	$file =~ s/^(\w:)?$RepositoryPath[\\\/]$Module[\\\/]//;
 	return $file;
 }
 
@@ -633,14 +646,15 @@ if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
-if ($QueryString =~ /-ignore=([^\s]+)/i)        { $Ignore{$1}=1; }
+if ($QueryString =~ /-ignore=([^\s]+)/i)        { $IgnoreFileDir{$1}=1; }
+if ($QueryString =~ /-only=([^\s]+)/i)        	{ $OnlyFileDir{$1}=1; }
 ($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
-debug("Module    : $Module");
-debug("Output    : $Output");
-debug("OutputDir : $OutputDir");
-debug("Branch    : $Branch");
-debug("ViewCvsUrl: $ViewCvsUrl");
+debug("Parameter Module    : $Module");
+debug("Parameter Output    : $Output");
+debug("Parameter OutputDir : $OutputDir");
+debug("Parameter Branch    : $Branch");
+debug("Parameter ViewCvsUrl: $ViewCvsUrl");
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
@@ -749,6 +763,10 @@ if ($tomorrowmin < 10) { $tomorrowmin = "0$tomorrowmin"; }
 if ($tomorrowsec < 10) { $tomorrowsec = "0$tomorrowsec"; }
 my $timetomorrow=$tomorrowyear.$tomorrowmonth.$tomorrowday.$tomorrowhour.$tomorrowmin.$tomorrowsec;	
 
+
+# -- Start for module
+
+
 # Check/Retreive module
 my $ModuleChoosed=$Module;
 if (! $Module || $Output =~ /^buildhtmlreport/) {
@@ -777,6 +795,11 @@ if (! $Module) {
 }
 
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
+
+# Define ModuleForCache (use for cache file and fullfilename)
+$ModuleForCache=$Module;
+$ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
+
 
 # Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
 my $CvsRootChoosed=$CvsRoot;
@@ -840,7 +863,7 @@ if (! $RLogFile) {
 	$TmpDir||=$ENV{"TMP"};
 	$TmpDir||=$ENV{"TEMP"};
 	$TmpDir||='/tmp';
-	my $TmpFile="$TmpDir/$PROG.$$.tmp";
+	my $TmpFile="$TmpDir/$PROG.$ModuleForCache.$$.tmp";
 	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file '$TmpFile' for writing. Check directory and permissions.");
 	my $command;
 	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
@@ -862,14 +885,11 @@ if (! $RLogFile) {
 	$RLogFile=$TmpFile;
 }
 
-
 # ANALYZE RLOGFILE
 #------------------------
 writeoutput("Analyzing rlog file '$RLogFile'\n",1);
 if ($Output =~ /^buildhtmlreport/) {
     # Try to read cache file
-    my $ModuleForCache=$Module;
-    $ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
     my $cachefile="${OutputDir}${PROG}_${ModuleForCache}.cache";
     debug(" Search for cache file '$cachefile' into current directory",1);
     if (-f $cachefile) {
@@ -877,8 +897,9 @@ if ($Output =~ /^buildhtmlreport/) {
         open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
         while (<CACHE>) {
             chomp $_; s/\r$//;
+            if (! $_) { next; }
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
-            debug(" Load cache entry for ($file,$revision)=$nbline",1);
+            debug(" Load cache entry for ($file,$revision)=$nbline",2);
             $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
         }
         close CACHE;
@@ -907,18 +928,26 @@ while (<RLOGFILE>) {
 	if ($waitfor eq "filename") {
         #if ($line =~ /^cvs rlog: Logging (.*)/) { $Module=$1; } # Set module name from log file
 		if ($line =~ /$EXTRACTFILENAME/i) {
-			$filename=$1;
-			$filename =~ s/,v$//g;					# Clean filename if ended with ",v"
+			$filename="$1";
+			$filename =~ s/,v$//;					# Clean filename if ended with ",v"
+			$fullfilename="$ModuleForCache\@$filename";
+			my $truefilename=ExcludeRepositoryFromPath("$filename",0,1);
 			# We found a new filename
-			debug("Found a new file '$filename'",2);
-            if (! $Ignore{$filename}) {
+			debug("Found a new file '$fullfilename'",2);
+            my $qualified=1;
+            if ($IgnoreFileDir{$truefilename} || $IgnoreFileDir{$truefilename}) { $qualified=-1; }
+            if (scalar keys %OnlyFileDir && ! $OnlyFileDir{$truefilename} && ! $OnlyFileDir{$truefilename}) { $qualified=-2; }
+    		if ($qualified > 0) {
     			debug("File is qualified to be included in report",2);
     			$waitfor="symbolic_name";
-	    		$maxincludedver{"$filename"}=0;
-			    $minexcludedver{"$filename"}=0;
+	    		$maxincludedver{"$fullfilename"}=0;
+			    $minexcludedver{"$fullfilename"}=0;
             }
-            else {
-    			debug("File discarded by ignore optione",2);
+    		if ($qualified == -1) {
+    			debug("File discarded by ignore option",2);
+            }
+    		if ($qualified == -2) {
+    			debug("File discarded by only option",2);
             }
 		}
 		next;
@@ -938,16 +967,16 @@ while (<RLOGFILE>) {
 	if ($waitfor eq "symbolic_name_entry") {
 		if ($line =~ /$EXTRACTSYMBOLICNAMEENTRY/i) {
 			# We found symbolic name entry
-			# We set symbolic name. Example: $filesym{$filename}{MYAPPLI_1_0}=1.2
-			$filesym{$filename}{$1}=$2;
-			debug("Found symbolic name entry $1 is for version $filesym{$filename}{$1}",2);
+			# We set symbolic name. Example: $filesym{$fullfilename}{MYAPPLI_1_0}=1.2
+			$filesym{$fullfilename}{$1}=$2;
+			debug("Found symbolic name entry $1 is for version $filesym{$fullfilename}{$1}",2);
 			if ($TagEnd && $TagEnd eq $1) {
-				$maxincludedver{"$filename"}=$2;
-				debug(" Max included version for file '$filename' set to $2",3);
+				$maxincludedver{"$fullfilename"}=$2;
+				debug(" Max included version for file '$fullfilename' set to $2",3);
 			}
 			if ($TagStart && $TagStart eq $1) {
-				$minexcludedver{"$filename"}=$2;
-				debug(" Min excluded version for file '$filename' set to $2",3);
+				$minexcludedver{"$fullfilename"}=$2;
+				debug(" Min excluded version for file '$fullfilename' set to $2",3);
 			}
 		}
 		else {
@@ -1366,7 +1395,7 @@ if ($Output =~ /buildhtmlreport$/) {
     do {
         push @absi, substr($cursor,0,4)."-".substr($cursor,4,2);
         $cumul+=$yearmonth{$cursor};
-        push @ordo, $cumul;
+        push @ordo, ($cumul>=0?$cumul:0);	# $cumul should not be negative but occurs sometimes when cvs errors
         foreach my $user (keys %yearmonthusernbcommit) {
             $cumulnbcommituser{$user}+=$yearmonthusernbcommit{$user}{$cursor};
             if ($yearmonthusernbcommit{$user}{$cursor}) { push @{$ordonbcommituser{$user}}, $yearmonthusernbcommit{$user}{$cursor}; }
@@ -1514,7 +1543,7 @@ else {
 #    $graph->set_legend_font("");
 #    $graph->set(legend_placement=>'Right');
     my $gd = $graph->plot(\@data) or die $graph->error;
-    open(IMG, ">${OutputDir}$pngfile") or die $!;
+    open(IMG, ">${OutputDir}$pngfile") or die "Error $!";
     binmode IMG;
     print IMG $gd->png;
     close IMG;
@@ -1795,11 +1824,12 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
 			$state =~ s/_forced//;
-			my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
-			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
-			writeoutputfile ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
-			writeoutputfile ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
-			writeoutputfile ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+#			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,0),$version)." $version (".FormatState($state);
+			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
+			my $lines=$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision};
+			writeoutputfile ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
+			writeoutputfile ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
+			writeoutputfile ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
             if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
                 if ($state eq 'changed') {
 			        writeoutputfile ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
