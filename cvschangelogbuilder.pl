@@ -35,7 +35,7 @@ my $nowsec = my $nowmin = my $nowhour = my $nowday = my $nowmonth = my $nowyear 
 my $filename='';
 my %filesym=();
 my $fileformat='';
-my $fileversion='';
+my $filerevision='';
 my $filedate='';
 my $fileauthor='';
 my $filestate='';
@@ -54,6 +54,7 @@ my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)
 my $CVSCLIENT="cvs";
 my $COMP=" -z 6 ";
 my $ViewCvsUrl="";
+my $ENABLEREQUESTFORADD=1;
 # ---------- Init Regex --------
 use vars qw/ $regclean1 $regclean2 /;
 $regclean1=qr/<(recnb|\/td)>/i;
@@ -62,6 +63,7 @@ $regclean2=qr/<\/?[^<>]+>/i;
 # For all
 my %maxincludedver=();
 my %minexcludedver=();
+my %Cache=();
 # For output by date
 my %DateAuthor=();
 my %DateAuthorLog=();
@@ -109,7 +111,7 @@ sub debug {
 	if ($Debug >= $level) { 
 		my $debugstring = $_[0];
 		if ($ENV{"GATEWAY_INTERFACE"}) { $debugstring =~ s/^ /&nbsp&nbsp /; $debugstring .= "<br>"; }
-		print "DEBUG $level - ".time." : $debugstring\n";
+		print STDERR "DEBUG $level - ".time." : $debugstring\n";
 		}
 	0;
 }
@@ -120,8 +122,7 @@ sub debug {
 sub writeoutput {
     my $string=shift;
     my $screenonly=shift;
-    if ($Output !~ /^buildhtmlreport/ || ! $screenonly) { print $string; }
-    debug($string);
+    print STDERR $string;
 	0;
 }
 
@@ -191,41 +192,62 @@ sub LoadDataInMemory {
 	}
 	# We know state
 	# If added or removed, value for lines added and deleted is not correct, so we download file to count it
-	# TODO
-	
+    if ($newfilestate eq 'added' && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
+        my $nbline=0;
+	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
+        if (! defined $Cache{$relativefilename}{$filerevision}) {
+            # If number of file not available in cache file
+	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -r $filerevision $relativefilename $Module";
+	        debug("Getting file $filename revision $filerevision\n",2);
+	        debug("with command '$command'\n",2);
+            my $pid = open(PH, "$command 2>&1 |");                 # with an open pipe
+            while (<PH>) {
+                $nbline++;
+            }   
+            debug("Nb of line : $nbline",2);
+            # Save result in a cache for other run
+            print CACHE "$relativefilename $filerevision $nbline\n";
+        }
+        else {
+            $nbline=$Cache{$relativefilename}{$filerevision};
+        }
+        print STDERR ".";
+        $filechange="+$nbline -0";
+        $filelineadd=$nbline;
+	}
 	
 	# All infos were found. We can process record
-	debug(">>>> File revision: $fileformat - $newfilename - $fileversion - $filedate - $fileauthor - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
+	debug(">>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileauthor - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
 	
 	# For output by date
 	if ($Output =~ /bydate/ || $Output =~ /forrpm/ || $Output =~ /buildhtmlreport/) {
 		my $fileday=$filedate; $fileday =~ s/\s.*//g;
 		$DateAuthor{"$fileday $fileauthor"}=1;
 		$DateAuthorLog{"$fileday $fileauthor"}{$newfilelog}=1;
-		$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $fileversion"}=$newfilestate;
-		if ($newfilestate eq "removed") {
+		$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
+		if ($newfilestate eq 'removed') {
 			# Change a state of a revision from "changed" into "added" when previous revision was "removed"
-			my $fileversionnext=$fileversion;
-			if ($fileversionnext =~ /\.(\d+)$/) {
+			my $filerevisionnext=$filerevision;
+			if ($filerevisionnext =~ /\.(\d+)$/) {
 				my $newver=int($1)+1;
-				$fileversionnext =~ s/\.(\d+)$/\.$newver/;
+				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
-			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"} =~ /^changed$/) {
-				debug("Correct next version of $newfilename $fileversionnext ($fileversionnext should be 'added_forced' instead of 'changed')",3);
-				$DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"}="added_forced";
+			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^changed$/) {
+				debug("Correct next version of $newfilename $filerevisionnext ($filerevisionnext should be 'added_forced' instead of 'changed')",3);
+				$DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"}="added_forced";
 			}
 		}
 		# When a version file does not exists in end, all versions are at state 'removed'.
 		# We must change this into "changed" for those whose next revision exists and is 'removed'. Only last one stay 'removed'.
-		if ($newfilestate eq "removed") {
-			my $fileversionnext=$fileversion;
-			if ($fileversionnext =~ /\.(\d+)$/) {
+		if ($newfilestate eq 'removed') {
+			my $filerevisionnext=$filerevision;
+			if ($filerevisionnext =~ /\.(\d+)$/) {
 				my $newver=int($1)+1;
-				$fileversionnext =~ s/\.(\d+)$/\.$newver/;
+				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
-			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $fileversionnext"} =~ /^(removed|changed_forced)$/) {
-				debug("Correct version of $newfilename $fileversion ($fileversion should be 'changed_forced' instead of 'removed')",3);
-				$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $fileversion"}='changed_forced';	# with _forced to not be change again by previous test
+			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^(removed|changed_forced)$/) {
+				debug("Correct version of $newfilename $filerevision ($filerevision should be 'changed_forced' instead of 'removed')",3);
+				$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}='changed_forced';	# with _forced to not be change again by previous test
 			}
 		}
 		# Var used to retrieve easily the revision already read just before the one processed in this function
@@ -234,28 +256,28 @@ sub LoadDataInMemory {
 
 		my $filechangebis=$filechange; $filechangebis=~s/\-/ \-/;
 		if ($fileformat ne 'b') {
-		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $fileversion"}=$filechangebis;
+		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}=$filechangebis;
 		}
 		else {
-		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $fileversion"}='binary';
+		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}='binary';
 		}
 	}
 	
 	# For output by file
 	if ($Output =~ /byfile/ || $Output =~ /buildhtmlreport/) {
-		if (! $FilesLastVersion{$newfilename}) { $FilesLastVersion{$newfilename}=$fileversion; }	# Save 'last' file version
-		$FilesChangeDate{$newfilename}{$fileversion}=$filedate;
-		$FilesChangeAuthor{$newfilename}{$fileversion}=$fileauthor;
-		$FilesChangeState{$newfilename}{$fileversion}=$newfilestate;
-		$FilesChangeLog{$newfilename}{$fileversion}=$newfilelog;
+		if (! $FilesLastVersion{$newfilename}) { $FilesLastVersion{$newfilename}=$filerevision; }	# Save 'last' file version
+		$FilesChangeDate{$newfilename}{$filerevision}=$filedate;
+		$FilesChangeAuthor{$newfilename}{$filerevision}=$fileauthor;
+		$FilesChangeState{$newfilename}{$filerevision}=$newfilestate;
+		$FilesChangeLog{$newfilename}{$filerevision}=$newfilelog;
 	}
 	
 	# For output by log
 	if ($Output =~ /bylog/ || $Output =~ /buildhtmlreport/) {
 		$LogChange{$newfilelog}=1;
-		$LogChangeDate{$newfilelog}{"$newfilename $fileversion"}=$filedate;
-		$LogChangeAuthor{$newfilelog}{"$newfilename $fileversion"}=$fileauthor;
-		$LogChangeState{$newfilelog}{"$newfilename $fileversion"}=$newfilestate;
+		$LogChangeDate{$newfilelog}{"$newfilename $filerevision"}=$filedate;
+		$LogChangeAuthor{$newfilelog}{"$newfilename $filerevision"}=$fileauthor;
+		$LogChangeState{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
 	}
 	
 	if ($Output =~ /^buildhtmlreport/) {
@@ -484,7 +506,8 @@ if ($Help || ! $Output) {
 	writeoutput("\n");
 	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
 	writeoutput("  -debug=x            To get debug info with level x\n");
-	writeoutput("  -rlogfile=rlogfile  To build changelog from an already existing rlog file\n");
+	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
+	writeoutput("                      this option to save on step, for a faster result.\n");
 	writeoutput("\n");
 	writeoutput("Example:\n");
 	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
@@ -534,8 +557,8 @@ if (! $Module) {
 }
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
-# Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile)
-if (! $RLogFile) {
+# Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile || buildhtmlreport)
+if (! $RLogFile || $Output =~ /buildhtmlreport/) {
 	if (! $CvsRoot) {
 		# Try to set CvsRoot from CVS repository
 		if (-s "CVS/Root") {
@@ -575,6 +598,7 @@ if ($UseSsh) {
 # LAUNCH CVS COMMAND RLOG TO WRITE RLOGFILE
 #------------------------------------------
 if (! $RLogFile) {
+    print STDERR "No log file yet, so please wait...\n";
 	# Define temporary file
 	my $TmpDir="";
 	$TmpDir||=$ENV{"TMP"};
@@ -603,7 +627,25 @@ if (! $RLogFile) {
 
 # ANALYZE RLOGFILE
 #------------------------
-writeoutput("Formating output $Output from rlog file '$RLogFile'...\n\n",1);
+writeoutput("Analyzing rlog file '$RLogFile'\n",1);
+if ($Output =~ /^buildhtmlreport/) {
+    my $cachefile="${PROG}_$Module.cache";
+    if (-f $cachefile) {
+        writeoutput("Load cache file '$cachefile' with number of lines for added files...\n",1);
+        open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
+        while (<CACHE>) {
+            chomp $_; s/\r$//;
+            my ($file,$revision,$nbline)=split(/\s+/,$_);
+            debug(" Add entry in cache for ($file,$revision)=$nbline",2);
+            $Cache{$file}{$revision}=$nbline;
+        }
+        close CACHE;
+    } else {
+        print STDERR "No cache file yet, so it can takes a long time. Please wait...\n";
+    }
+    open(CACHE,">>$cachefile") || error("Failed to open cache file '$cachefile' for writing");
+}
+
 open(RLOGFILE,"<$RLogFile") || error("Can't open rlog file");
 my $waitfor="filename";
 while (<RLOGFILE>) {
@@ -675,9 +717,9 @@ while (<RLOGFILE>) {
 		}
 		if ($line =~ /$EXTRACTFILEVERSION/i) {
 			# We found a new revision number
-			$fileversion=$1;
+			$filerevision=$1;
 			$waitfor="dateauthorstate";
-			debug("Found a new revision number $fileversion",2);
+			debug("Found a new revision number $filerevision",2);
 		}
 		next;
 	}
@@ -725,9 +767,14 @@ while (<RLOGFILE>) {
 		next;
 	}
 }
+close RLOGFILE;
+close CACHE;
+
+
 
 # BUILD OUTPUT
 #------------------------
+writeoutput("Build output for option '$Output'\n",1);
 
 # Build header
 my $headstring='';
@@ -911,6 +958,36 @@ if ($Output =~ /bylog$/) {
 
 # For building html report
 if ($Output =~ /buildhtmlreport$/) {
+    writeoutput("Generating HTML report...\n");
+
+    my $colorfile="#AA88BB";
+    my $colorcommit="#9988EE";
+    
+    # Made some calculation on commits by author
+    my %nbcommit=(); my %nbfile=();
+    my $nbtotalcommit=0; my $nbtotalfile=0;
+    foreach my $key (sort keys %AuthorChangeCommit) {
+        foreach my $file (keys %{$AuthorChangeCommit{$key}}) {
+           $nbcommit{$key}+=$AuthorChangeCommit{$key}{$file};
+           $nbfile{$key}++;
+           $nbtotalcommit+=$AuthorChangeCommit{$key}{$file};
+           $nbtotalfile++;
+        }
+    }
+    
+    # Made some calculation on state
+    my %TotalCommitByState=('added'=>0,'changed'=>0,'removed'=>0);
+    foreach my $dateuser (reverse sort keys %DateAuthor) {
+        my ($date,$user)=split(/\s+/,$dateuser);
+    	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
+    		foreach my $filerevision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+                my ($file,$revision)=split(/\s+/,$filerevision);
+    			my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$filerevision};
+    			$state =~ s/_forced//;
+                $TotalCommitByState{$state}++;
+            }
+        }
+    }
 
 print <<EOF;
 
@@ -924,29 +1001,16 @@ print <<EOF;
 <br />
 
 <a name="summary">&nbsp;</a><br />
-<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="400">
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0">
 <tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank">&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-my %TotalState=('added'=>0,'changed'=>0,'removed'=>0);
-foreach my $dateuser (reverse sort keys %DateAuthor) {
-    my ($date,$user)=split(/\s+/,$dateuser);
-	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
-			my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$revision};
-			$state =~ s/_forced//;
-            $TotalState{$state}++;
-        }
-    }
-}
-print "<tr><td class=\"aws\">Project module name</td><td class=\"aws\"><b>$Module</b></td></tr>";
-print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>";
-print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
-print "<tr><td bgcolor=\"#FFF0E0\" class=\"aws\">Active developers</td><td>".(scalar keys %AuthorChangeCommit)."</td></tr>";
-print "<tr><td bgcolor=\"#AA88BB\" class=\"aws\">Files added</td><td>$TotalState{'added'}</td></tr>";
-print "<tr><td bgcolor=\"#AA88BB\" class=\"aws\">Files changed</td><td>$TotalState{'changed'}</td></tr>";
-print "<tr><td bgcolor=\"#AA88BB\" class=\"aws\">Files removed</td><td>$TotalState{'removed'}</td></tr>";
+print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"aws\" colspan=\"2\"><b>$Module</b></td></tr>";
+print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"2\"><b>$rangestring</b></td></tr>";
+print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"2\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
+print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Active developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
+print "<tr><td bgcolor=\"$colorcommit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove files</td></tr>";
 print <<EOF;
 </table></td></tr></table><br />
 
@@ -985,6 +1049,7 @@ if (!eval ('require "GD/Graph/lines.pm";')) {
 }
 if (! $errorstring) {
     my @absi=(); my @ordo=(); my $cumul=0;
+    # We need to build array values for char and complete holes
     my $mincursor='';
     my $maxcursor='';
     foreach my $key (sort keys %yearmonth) {
@@ -1001,7 +1066,7 @@ if (! $errorstring) {
         $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
     }
     until ($cursor > $maxcursor);
-    my $pngfile="cvschglogb1.png";
+    my $pngfile="${PROG}_${Module}_1.png";
     my @data = ([@absi],[@ordo]);
     my $graph = GD::Graph::lines->new(700, 300);
     $graph->set( 
@@ -1049,15 +1114,8 @@ print <<EOF;
 <tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="#AA88BB" width="140">Number of files commited</th><th bgcolor="#8877DD" width="140">Number of commits</th><th bgcolor="#C1B2E2" width="140">Lines<br>(added, modified, removed)*</th><th bgcolor="#CEC2E8" width="140">Lines by commit<br>(added, modified, removed)*</th><th bgcolor="#88A495" width="140">Last change</th><th>&nbsp; </th></tr>
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$colorfile" width="140">Different files commited</th><th bgcolor="$colorcommit" width="140">Number of commits</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
-my %nbcommit=(); my %nbfile=();
-foreach my $key (sort keys %AuthorChangeCommit) {
-    foreach my $file (keys %{$AuthorChangeCommit{$key}}) {
-       $nbcommit{$key}+=$AuthorChangeCommit{$key}{$file};
-       $nbfile{$key}++;
-    }
-}
 foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
     print "<tr><td class=\"aws\">";
     print $key;
@@ -1066,9 +1124,9 @@ foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit
     print "</td><td>";
     print $nbcommit{$key};
     print "</td><td>";
-    print $AuthorChangeLineAdd{$key}."/".$AuthorChangeLineChange{$key}."/".$AuthorChangeLineDel{$key};
+    print $AuthorChangeLineAdd{$key}." / ".$AuthorChangeLineChange{$key}." / ".$AuthorChangeLineDel{$key};
     print "</td><td>";
-    print RoundNumber($AuthorChangeLineAdd{$key}/$nbcommit{$key},1)."/".RoundNumber($AuthorChangeLineChange{$key}/$nbcommit{$key},1)."/".RoundNumber($AuthorChangeLineDel{$key}/$nbcommit{$key},1);
+    print RoundNumber($AuthorChangeLineAdd{$key}/$nbcommit{$key},1)." / ".RoundNumber($AuthorChangeLineChange{$key}/$nbcommit{$key},1)." / ".RoundNumber($AuthorChangeLineDel{$key}/$nbcommit{$key},1);
     print "</td><td>";
     print FormatDate($AuthorChangeLast{$key},'simple');
     print "</td>";
@@ -1136,5 +1194,9 @@ if ($Output =~ /buildhtmlreport$/) {
 	print "<br />\n";
 	print "</body>\n</html>\n";
 }
+
+
+print STDERR ucfirst($PROG)." finished successfully.\n";
+
 
 0;
