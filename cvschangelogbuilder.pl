@@ -352,11 +352,12 @@ sub FormatDiffLink {
 	my $url=shift;
 	my $version=shift;
     my $string='';
-    if ($ViewCvsUrl) { $string="$ViewCvsUrl"; }
+    if ($ViewCvsUrl) { $string="$ViewCvsUrl/$Module"; }
     $string.="$url";
     if ($ViewCvsUrl) { 
         if (CompareVersionBis($version,"1.1")>0) {
-            $string.=".diff?r1=";
+            my $versionprec=DecreaseVersion($version);
+            $string.=".diff?r1=".$versionprec;
             $string.="&r2=".$version;
         }
         else {
@@ -418,6 +419,19 @@ sub CompareVersionBis {
 	if ($adec < $bdec) { return -1; }
 	if ($adec > $bdec) { return 1; }
 	return 0;
+}
+
+#------------------------------------------------------------------------------
+# Function:      Decrease a version number by one
+# Input:         1.159
+# Output:        1.158
+#------------------------------------------------------------------------------
+sub DecreaseVersion {
+	my $a=shift;
+	my $aint; my $adec;
+	if ($a =~ /^(\d+)\.(\d+)$/) { $aint=int($1); $adec=int($2); } else { $aint=int($a); $adec=0; }
+    $adec--;
+	return "$aint.$adec";
 }
 
 sub ExcludeRepositoryFromPath {
