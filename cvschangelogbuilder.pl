@@ -52,8 +52,8 @@ my $EXTRACTSYMBOLICNAMEAREA="symbolic names:";
 my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEUSERSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
-my $CVSCLIENT="cvs";
-my $COMP="";    # Do no use compression because returned bugged rlog files for some servers/clients.
+my $CVSCLIENT="cvs -f";
+my $COMP="";    # Do no use compression because it seems to return bugged rlog files for some servers/clients.
 my $ViewCvsUrl="";
 my $ENABLEREQUESTFORADD=1;
 # ---------- Init Regex --------
@@ -263,7 +263,7 @@ sub LoadDataInMemory {
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$filename");
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$filename",1);
-        if (! defined $Cache{$relativefilename}{$filerevisiontoscan}) {
+        if (! defined $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} eq 'ERROR') {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
@@ -623,7 +623,8 @@ if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
-($DIR=$0) =~ s/([^\/\\]*)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
+($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
+$DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
 debug("Module    : $Module");
 debug("Output    : $Output");
 debug("OutputDir : $OutputDir");
@@ -633,7 +634,7 @@ if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
 my $REPRACINE;
 if (! $ENV{"SERVER_NAME"}) {
-	$REPRACINE=($DIR?$DIR:".")."/..";
+	$REPRACINE="$DIR/..";
 } else {
 	$REPRACINE=$ENV{"DOCUMENT_ROOT"};
 }
@@ -852,17 +853,19 @@ if (! $RLogFile) {
 #------------------------
 writeoutput("Analyzing rlog file '$RLogFile'\n",1);
 if ($Output =~ /^buildhtmlreport/) {
-    my $cachefile="${PROG}_$Module.cache";
+    my $ModuleForCache=$Module;
+    $ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
+    my $cachefile="${PROG}_${ModuleForCache}.cache";
     if (-f $cachefile) {
         writeoutput("Load cache file '$cachefile' with number of lines for added files...\n",1);
         open(CACHE,"<$cachefile") || error("Failed to open cache file '$cachefile' for reading");
         while (<CACHE>) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
-            if ($nbline ne 'ERROR') {
+#            if ($nbline ne 'ERROR') {
                 debug(" Load cache entry for ($file,$revision)=$nbline",2);
                 $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
-            }
+#            }
         }
         close CACHE;
     } else {
