@@ -1060,7 +1060,7 @@ body { font: 11px verdana, arial, helvetica, sans-serif; background-color: #FFFF
 .aws_bodyl  { }
 .aws_border { background-color: #FFE0B0; padding: 1px 1px 1px 1px; margin-top: 0; margin-bottom: 0; }
 .aws_title  { font: 13px verdana, arial, helvetica, sans-serif; font-weight: bold; background-color: #FFE0B0; text-align: center; margin-top: 0; margin-bottom: 0; padding: 1px 1px 1px 1px; color: #000000; }
-.aws_blank  { font: 13px verdana, arial, helvetica, sans-serif; background-color: #FFE0B0; text-align: center; margin-bottom: 0; padding: 1px 1px 1px 1px; }
+.aws_blank  { font: 13px verdana, arial, helvetica, sans-serif; background-color: #FFE0B0; text-align: right; margin-bottom: 0; padding: 1px 1px 1px 1px; }
 .aws_data {
 	background-color: #FFFFFF;
 	border-top-width: 1px;   
@@ -1079,6 +1079,7 @@ th		{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; bo
 th.aws	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 2px 1px 1px; font-size: 13px; font-weight: bold; }
 td		{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 1px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:center; color: #000000; }
 td.aws	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 1px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:left; color: #000000; }
+td.awr	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 1px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:right; color: #000000; }
 td.awsm	{ border-left-width: 0px; border-right-width: 0px; border-top-width: 0px; border-bottom-width: 0px; padding: 0px 0px 0px 0px; font: 11px verdana, arial, helvetica, sans-serif; text-align:left; color: #000000; }
 b { font-weight: bold; }
 a { font: 11px verdana, arial, helvetica, sans-serif; }
@@ -1215,8 +1216,8 @@ if ($Output =~ /buildhtmlreport$/) {
     my $color_lines2="#EFE2FF";
     my $color_last="#A8C0A8";   #   my $color_last="#88A495";
 
-    my $color_lightgrey="#F0F0F0";
-    my $color_grey="#888888";
+    my $color_lightgrey="#F8F6F8";
+    my $color_grey="#CDCDCD";
 
     # Made some calculation on commits by user
     my %nbcommit=(); my %nbfile=();
@@ -1333,6 +1334,7 @@ if ($Output =~ /buildhtmlreport$/) {
     $TotalLine=$TotalLineByState{'added'}+$TotalLineByState{'removed'};
 
     # Define absi and ordo and complete holes
+    # We start with cursor = lower YYYYMM
     my $cursor=$minyearmonth;
     do {
         push @absi, substr($cursor,0,4)."-".substr($cursor,4,2);
@@ -1340,26 +1342,21 @@ if ($Output =~ /buildhtmlreport$/) {
         push @ordo, $cumul;
         foreach my $user (keys %yearmonthusernbcommit) {
             $cumulnbcommituser{$user}+=$yearmonthusernbcommit{$user}{$cursor};
-            push @{$ordonbcommituser{$user}}, $yearmonthusernbcommit{$user}{$cursor};
+            if ($yearmonthusernbcommit{$user}{$cursor}) { push @{$ordonbcommituser{$user}}, $yearmonthusernbcommit{$user}{$cursor}; }
+            else { push @{$ordonbcommituser{$user}}, 0; }
         }
         $cursor=~/(\d\d\d\d)(\d\d)/;
+        # Increase cursor for next month
         $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
     }
     until ($cursor > $maxyearmonth);
 
     
 writeoutputfile <<EOF;
+<a name="top">&nbsp;</a>
 
-<a name="menu">&nbsp;</a>
-<table border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td>
-<table class="aws_data" border="0" cellpadding="1" cellspacing="0" width="100%">
-<tr><td class="awsm">$headstring</td></tr>
-</table>
-</td></tr></table>
-<br />
-
-<a name="parameters">&nbsp;</a><br />
+<table width="100%"><tr><td>
+<a name="parameters">&nbsp;</a><br>
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0">
 <tr><td class="aws_title" width="70%">CVS analysis' parameters</td><td class="aws_blank">&nbsp;</td></tr>
 <tr><td colspan="2">
@@ -1372,11 +1369,22 @@ writeoutputfile "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"
 writeoutputfile "<tr><td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
 
 writeoutputfile <<EOF;
-</table></td></tr></table><br />
+</table></td></tr></table>
+
+</td><td>
+$headstring<br>
+<a href="#summary">Summary</a> &nbsp; 
+<a href="#linesofcode">Lines&nbsp;of&nbsp;code</a> &nbsp; 
+<a href="#developers">Developers&nbsp;activity</a> &nbsp; 
+<a href="#daysofweek">Days&nbsp;of&nbsp;week</a> &nbsp; 
+<a href="#hours">Hours</a> &nbsp;
+<a href="#lastlogs">Last&nbsp;commits</a> &nbsp;
+</td></tr></table>
+<br />
 
 <a name="summary">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
@@ -1437,25 +1445,28 @@ writeoutputfile <<EOF;
 
 <a name="linesofcode">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Lines of code*</td><td class="aws_blank">(* on non binary files only)</td></tr>
-<tr><td colspan="2">
+<tr><td class="aws_title" width="70%">Lines of code*</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
+<tr><td class="aws" colspan="2">
 <table class="aws_data month" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 
-<tr><td align="center">
+<tr><td class="aws">
+This chart represents the balance between number of lines added and removed in non binary files (source files).<br>
 <center>
 EOF
 
 # LINES OF CODE
 #--------------
 
-writeoutputfile "<table>";
-writeoutputfile "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
+writeoutputfile "<table width=\"100%\">";
+#writeoutputfile "<tr><td align=\"left\" colspan=\"3\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
 writeoutputfile "<tr><td>&nbsp;</td>";
 # Build chart
 if ($errorstringlines) {
     writeoutputfile "<td>Perl module GD::Graph::lines must be installed to get charts</td>";   
 }
 else {
+    my $MAXABS=12;  # TODO limit to 10
+    my $col="#706880"; $col=~s/#//;
     # Build graph
     my $pngfile="${PROG}_${Module}_codelines.png";
     my @data = ([@absi],[@ordo]);
@@ -1468,7 +1479,7 @@ else {
           boxclr            => $color_lightgrey,
           fgclr             => $color_grey,
           line_types        => [1, 2, 3],
-          dclrs             => [ qw(blue) ]
+          dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
     my $gd = $graph->plot(\@data) or die $graph->error;
@@ -1477,7 +1488,7 @@ else {
     print IMG $gd->png;
     close IMG;
     # End build graph
-    writeoutputfile "<td><img src=\"$pngfile\" border=\"0\"></td>";
+    writeoutputfile "<td><br><img src=\"$pngfile\" border=\"0\"></td>";
 }
 writeoutputfile "<td>&nbsp;</td></tr>\n";
 writeoutputfile "</table>\n";
@@ -1486,9 +1497,9 @@ writeoutputfile <<EOF;
 </center>
 </td></tr></table></td></tr></table><br />
 
-<a name="developpers">&nbsp;</a><br />
+<a name="developers">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
+<tr><td class="aws_title" width="70%">Developers activity*</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data users" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 <tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="$color_lines" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="$color_lines2" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="$color_last" width="140">Last commit</th><th>&nbsp; </th></tr>
@@ -1519,14 +1530,12 @@ if (scalar keys %nbcommit > 1) {
         writeoutputfile "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
     }
     else {
-        my $MAXABS=12;
-        # TODO limit to 5
-        my $col;
-        # Build graph
+        my $MAXABS=12;  # TODO limit to 10
+        my $col=$color_commit; $col=~s/#//;
+        # Build graph for developer ratio
         my $pngfilenbcommit="${PROG}_${Module}_developerscommit.png";
         my @data = ([keys %nbcommit],[values %nbcommit]);
         my $graph = GD::Graph::pie->new(160, 138);
-        $col=$color_commit; $col=~s/#//;
         $graph->set( 
               title             => 'Number of commits',
               axislabelclr      => qw(black),
@@ -1560,40 +1569,68 @@ if (scalar keys %nbcommit > 1) {
         print IMG $gd->png;
         close IMG;
         # End build graph
-        writeoutputfile "<tr><td colspan=\"7\"><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
+        writeoutputfile "<tr><td colspan=\"7\"><br><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
     }
 }
 
-#        # Build graph
-#        my $pngfile="${PROG}_${Module}_codelinesbyuser.png";
-#        my @data = ([@absi],[ map{ @{$ordonbcommituser{$_}} } (keys %ordonbcommituser) ] );
-#        my $graph = GD::Graph::bars->new(640, 240);
-#        $graph->set( 
-#              #title             => 'Some simple graph',
-#              transparent       => 1,
-#              x_label           => 'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
-#              y_label           => 'Number of commits', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, #y_number_format   => "%06d",
-#              textclr           => $color_commit,
-#              boxclr            => $color_lightgrey,
-#              fgclr             => $color_grey,
-#              dclrs             => [ $color_commit ],
-#              accentclr         => "#444444",
-#              #borderclrs        => [ qw(blue green pink blue) ],
-#        ) or die $graph->error;
-#        my $gd = $graph->plot(\@data) or die $graph->error;
-#        open(IMG, ">$pngfile") or die $!;
-#        binmode IMG;
-#        print IMG $gd->png;
-#        close IMG;
-#        # End build graph
-#        print "<tr><td colspan=\"7\"><img src=\"$pngfile\" border=\"0\"></td></tr>\n";
+if (scalar keys %nbcommit > 0) {
+    if ($errorstringpie) {
+        writeoutputfile "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
+    }
+    else {
+        my $MAXABS=12;  # TODO limit to 10
+        my $TICKSNB=10;
+        my $col=$color_commit; $col=~s/#//;
+        # Build graph for activity by developer
+        my $pngfile="${PROG}_${Module}_commitshistorybyuser.png";
 
+        my $maxordo=0;
+        my @data = ();
+        #my @absi = ();
+        push @data, [@absi];
+        my $numdev=0;
+        foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
+            my @ordo=();
+            $numdev++;
+            if ($numdev > $MAXABS) { last; }
+            debug("Add array for developer=$developer",3);
+            foreach my $val (@{$ordonbcommituser{$developer}}) {
+                if ($val > $maxordo) { $maxordo=$val; }
+            }
+            push @data, [@{$ordonbcommituser{$developer}}];
+        }
+        # We level value for maxordo;
+        $maxordo=int($maxordo*1.05+1);
+    
+        my $graph = GD::Graph::lines->new(640, 240);
+        $graph->set( 
+              #title             => 'Some simple graph',
+              transparent       => 1,
+              x_label           => 'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
+              y_label           => 'Number of commits', y_min_value =>0, y_max_value =>$maxordo, y_label_skip =>1, y_long_ticks =>1, y_tick_number=>$TICKSNB,  #y_number_format   => "%06d",
+              textclr           => $color_commit,
+              boxclr            => $color_lightgrey,
+              fgclr             => $color_grey,
+#              line_types        => [1, 2, 3],
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
+              #borderclrs        => [ qw(blue green pink blue) ],
+        ) or die $graph->error;
+        my $gd = $graph->plot(\@data) or die $graph->error;
+        open(IMG, ">${OutputDir}$pngfile") or die $!;
+        binmode IMG;
+        print IMG $gd->png;
+        close IMG;
+        # End build graph
+        writeoutputfile "<tr><td colspan=\"7\"><br><img src=\"$pngfile\" border=\"0\"></td></tr>";
+    }
+}
 writeoutputfile <<EOF;
-</table></td></tr></table><br />
+</table>
+</td></tr></table><br />
 
 <a name="daysofweek">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Activity by days of week</td><td class="aws_blank"></td></tr>
+<tr><td class="aws_title" width="70%">Activity by days of week</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data daysofweek" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
@@ -1634,7 +1671,7 @@ else {
     print IMG $gd->png;
     close IMG;
     # End build graph
-    writeoutputfile "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+    writeoutputfile "<tr><td align=\"center\"><br><img src=\"$pngfile\" border=\"0\"></td></tr>";
 }
 
 writeoutputfile <<EOF;
@@ -1642,7 +1679,7 @@ writeoutputfile <<EOF;
 
 <a name="hours">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Activity by hours</td><td class="aws_blank"></td></tr>
+<tr><td class="aws_title" width="70%">Activity by hours</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data hours" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
@@ -1682,7 +1719,7 @@ else {
     print IMG $gd->png;
     close IMG;
     # End build graph
-    writeoutputfile "<tr><td align=\"center\"><img src=\"$pngfile\" border=\"0\"></td></tr>";
+    writeoutputfile "<tr><td align=\"center\"><br><img src=\"$pngfile\" border=\"0\"></td></tr>";
 }
 
 writeoutputfile <<EOF;
@@ -1690,7 +1727,7 @@ writeoutputfile <<EOF;
 
 <a name="lastlogs">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Last commit logs</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td class="aws_title" width="70%">Last commit logs</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data lastlogs" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
@@ -1699,7 +1736,7 @@ EOF
 #---------
 
 my $width=140;
-writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th>Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
 foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
@@ -1751,10 +1788,9 @@ EOF
 
 # Footer
 if ($Output =~ /buildhtmlreport$/) {
+    writeoutputfile "<table width=100%><tr><td class=\"aws\"><div style=\"align: left; font-size:11px; \">* on non binary files only</div></td>";
+	writeoutputfile "<td class=\"awr\"><b><a href=\"http://cvschangelogb.sourceforge.net\" target=\"awstatshome\">Created by $PROG $VERSION</a></b></td></tr></table>";
     writeoutputfile "<br />\n";
-	writeoutputfile "<b><a href=\"http://cvschangelogb.sourceforge.net\" target=\"awstatshome\">Created by $PROG $VERSION</a></b>";
-    writeoutputfile "<br />\n";
-	writeoutputfile "<br />\n";
 	writeoutputfile "</body>\n</html>\n";
 }
 
