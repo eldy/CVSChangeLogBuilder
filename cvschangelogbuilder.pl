@@ -423,7 +423,7 @@ sub CompareVersionBis {
 sub ExcludeRepositoryFromPath {
 	my $file=shift;
 	$file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/;
-	$file =~ s/^.*[\\\/]$Module[\\\/]//;		# Extract path of repository
+	$file =~ s/^$RepositoryPath[\\\/]$Module[\\\/]//;		# Extract path of repository
 	return $file;
 }
 
@@ -580,9 +580,13 @@ if (! $Module || $Output =~ /^buildhtmlreport/) {
 		close(REPOSITORY);
 	}
 }
+if ($Output =~ /^buildhtmlreport/ && ! $Module) {
+	writeoutput("\n");
+	error("To generate the buildhtmlreport output, $PROG must be launched from the checkout root directory of project.");
+}
 if ($Output =~ /^buildhtmlreport/ && $ModuleChoosed && $Module && $Module ne $ModuleChoosed) {
 	writeoutput("\n");
-	error("$PROG is launched from a checkout root directory of module '$Module' but you ask a report for module '$ModuleChoosed'.");
+	error("To generate the buildhtmlreport output, $PROG must be launched from the right checkout root directory.\n$PROG is launched from a checkout root directory of module '$Module' but you ask a report for module '$ModuleChoosed'.");
 }
 if (! $Module) {
 	writeoutput("\n");
@@ -590,39 +594,44 @@ if (! $Module) {
 }
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
-# Check/Retreive CVSROOT environment variable (needed only if no option -rlogfile || buildhtmlreport)
-if (! $RLogFile || $Output =~ /^buildhtmlreport/) {
-	my $CvsRootChoosed=$CvsRoot;
-	if (! $CvsRoot || $Output =~ /^buildhtmlreport/) {
-		# Try to get CvsRoot from CVS repository
-		if (-s "CVS/Root") {
-			open(REPOSITORY,"<CVS/Root") || error("Failed to open 'CVS/Root' file to get repository value.");
-			while (<REPOSITORY>) {
-				chomp $_; s/\r$//;
-				$CvsRoot=$_;
-				last;
-			}
-			close(REPOSITORY);
+# Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
+my $CvsRootChoosed=$CvsRoot;
+if (! $CvsRoot || $Output =~ /^buildhtmlreport/) {
+    $CvsRoot='';
+	# Try to get CvsRoot from CVS repository
+	if (-s "CVS/Root") {
+		open(REPOSITORY,"<CVS/Root") || error("Failed to open 'CVS/Root' file to get repository value.");
+		while (<REPOSITORY>) {
+			chomp $_; s/\r$//;
+			$CvsRoot=$_;
+			last;
 		}
+		close(REPOSITORY);
 	}
-    if ($Output =~ /^buildhtmlreport/ && $CvsRootChoosed && $CvsRoot && $CvsRoot ne $CvsRootChoosed) {
-	    writeoutput("\n");
-    	error("$PROG is launched from a checkout root directory of module '$Module' with cvsroot '$CvsRoot' but you ask a report ".($ModuleChoosed?"for module '$ModuleChoosed' ":"")."with a different cvsroot '$CvsRootChoosed'.");
-    }
-	if (! $CvsRoot) {
-		# Try to set CvsRoot from CVSROOT environment variable
-		if ($ENV{"CVSROOT"}) { $CvsRoot=$ENV{"CVSROOT"}; }
-	}
-	if (! $CvsRoot) {
-		writeoutput("\n");
-		error("The repository value to use was not provided and could not be detected.\nUse -d=repository option to specifiy repository value.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
-	}
-
-	$ENV{"CVSROOT"}=$CvsRoot;
-	writeoutput(ucfirst($PROG)." launched for repository: $CvsRoot\n",1);
-
+}
+if ($Output =~ /^buildhtmlreport/ && ! $CvsRoot) {
+	writeoutput("\n");
+	error("To generate the buildhtmlreport output, $PROG must be launched from a checkout root directory of project.");
+}
+if ($Output =~ /^buildhtmlreport/ && $CvsRootChoosed && $CvsRoot && $CvsRoot ne $CvsRootChoosed) {
+    writeoutput("\n");
+	error("To generate the buildhtmlreport output, $PROG must be launched from the right checkout root directory.\n$PROG is launched from a checkout root directory of module '$Module' with cvsroot '$CvsRoot' but you ask a report ".($ModuleChoosed?"for module '$ModuleChoosed' ":"")."with a different cvsroot '$CvsRootChoosed'.");
+}
+if (! $CvsRoot) {
+	# Try to set CvsRoot from CVSROOT environment variable
+	if ($ENV{"CVSROOT"}) { $CvsRoot=$ENV{"CVSROOT"}; }
+}
+if (! $CvsRoot) {
+	writeoutput("\n");
+	error("The repository value to use was not provided and could not be detected.\nUse -d=repository option to specifiy repository value.\n\nExample: $PROG.$Extension -output=$Output -module=mymodule -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot");
 }
 
+$ENV{"CVSROOT"}=$CvsRoot;
+writeoutput(ucfirst($PROG)." launched for CVSRoot: $CvsRoot\n",1);
+
+$RepositoryPath=$CvsRoot; $RepositoryPath=~s/.*:([^:]+)/$1/;
+writeoutput(ucfirst($PROG)." launched for directory repository: $RepositoryPath\n",1);
+$RepositoryPath=quotemeta($RepositoryPath);
 
 # Set use of ssh or not
 if ($UseSsh) {
@@ -663,6 +672,7 @@ if (! $RLogFile) {
 	}
 	$RLogFile=$TmpFile;
 }
+
 
 # ANALYZE RLOGFILE
 #------------------------
@@ -770,11 +780,8 @@ while (<RLOGFILE>) {
 			$filedate=$1; $fileauthor=$2; $filestate=$3; $filechange=$4;
 			$filedate =~ s/\///g;
 			$filelineadd=0; $filelinedel=0; $filelinechange=0;
-			$filechange =~ s/[^\s\d\+\-]+//g;
-			foreach my $key (split(/\s+/,$filechange)) {
-			    if (int($key)>0) { $filelineadd=int($key); }
-			    if (int($key)<0) { $filelinedel=(-int($key)); }
-			}
+			$filechange =~ s/.*([\+\-]\d+)\s+([\+\-]\d+).*/$1$2/g;
+            $filelineadd=int($1); $filelinedel=(-int($2));
 		    if ($filelineadd>=$filelinedel) { $filelineadd-=$filelinedel; $filelinechange=$filelinedel; $filelinedel=0; }
 		    else { $filelinedel-=$filelineadd; $filelinechange=$filelineadd; $filelineadd=0; }
 			$filedate =~ s/[\s;]+$//; $fileauthor =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
@@ -789,6 +796,7 @@ while (<RLOGFILE>) {
 		if ($line =~ /^branches:/) { next; }
 		if ($line =~ /^-----/) {
 			$waitfor="revision";
+			# Load all data for this revision file in memory
 			LoadDataInMemory();
 			debug(" Revision info are stored. Waiting for next $waitfor.",2);
 			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
@@ -796,6 +804,7 @@ while (<RLOGFILE>) {
 		}
 		if ($line =~ /^=====/) {
 			$waitfor="filename";
+			# Load all data for this revision file in memory
 			LoadDataInMemory();
 			debug(" Revision info are stored. Waiting for next $waitfor.",2);
 			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
@@ -903,20 +912,20 @@ EOF
 # For output by date
 if ($Output =~ /bydate$/ || $Output =~ /forrpm$/) {
 	if (scalar keys %DateAuthor) {
-		foreach my $date (reverse sort keys %DateAuthor) {
+		foreach my $dateuser (reverse sort keys %DateAuthor) {
 			my $firstlineprinted=0;
-			foreach my $logcomment (sort keys %{$DateAuthorLog{$date}}) {
-				foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$date}{$logcomment}}) {
+			foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
+				foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
 					$revision=~/(.*)\s([\d\.]+)/;
 					my ($file,$version)=($1,$2);
 					if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 					if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 					if (! $firstlineprinted) {
-						if ($Output =~ /forrpm$/) { print "* ".FormatDate($date,'rpm')."\n"; }
-						else { print FormatDate($date)."\n"; }
+						if ($Output =~ /forrpm$/) { print "* ".FormatDate($dateuser,'rpm')."\n"; }
+						else { print FormatDate($dateuser)."\n"; }
 						$firstlineprinted=1;
 					}
-					my $state=$DateAuthorLogFileRevState{$date}{$logcomment}{$revision};
+					my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$revision};
 					$state =~ s/_forced//;
 					if ($Output !~ /forrpm$/) {
 						print "\t* ".ExcludeRepositoryFromPath($file)." $version ($state):\n";
@@ -1030,7 +1039,7 @@ if ($Output =~ /buildhtmlreport$/) {
            $nbtotalfile++;
         }
     }
-    
+
     # Made some calculation on state
     my %TotalCommitByState=('added'=>0,'changed'=>0,'removed'=>0);
     foreach my $dateuser (reverse sort keys %DateAuthor) {
@@ -1044,6 +1053,43 @@ if ($Output =~ /buildhtmlreport$/) {
             }
         }
     }
+
+    my @absi=(); my @ordo=(); my %ordonbcommituser=();
+    my $cumul=0; my %cumulnbcommituser=();
+
+    # Made some calculation on commit by date, by user
+    my %yearmonth=(); my %yearmonthusernbcommit=();
+    my $mincursor='';
+    my $maxcursor='';
+    foreach my $dateuser (sort keys %DateAuthor) {  # By ascending date
+        my ($date,$user)=split(/\s+/,$dateuser);
+        if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
+        	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
+        		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+                    my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
+                    $yearmonth{"$1$2"}+=int($add);
+                    $yearmonth{"$1$2"}+=int($del);
+                    $yearmonthusernbcommit{$user}{"$1$2"}++;
+                }
+            }
+            if (! $mincursor) { $mincursor="$1$2"; }
+            $maxcursor="$1$2";
+        }
+    }
+    # Define absi and ordo and complete holes
+    my $cursor=$mincursor;
+    do {
+        push @absi, substr($cursor,0,4)."-".substr($cursor,4,2);
+        $cumul+=$yearmonth{$cursor};
+        push @ordo, $cumul;
+        foreach my $user (keys %yearmonthusernbcommit) {
+            $cumulnbcommituser{$user}+=$yearmonthusernbcommit{$user}{$cursor};
+            push @{$ordonbcommituser{$user}}, $yearmonthusernbcommit{$user}{$cursor};
+        }
+        $cursor=~/(\d\d\d\d)(\d\d)/;
+        $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
+    }
+    until ($cursor > $maxcursor);
 
 print <<EOF;
 
@@ -1090,49 +1136,21 @@ print "<tr><td colspan=\"3\" class=\"aws\">This chart represents the balance bet
 print "<tr><td>&nbsp;</td>";
 # Build chart
 if ($errorstringlines) {
-    print "<td>Perl module GD::Graph must be installed to get charts</td>";   
+    print "<td>Perl module GD::Graph::lines must be installed to get charts</td>";   
 }
 else {
-    my @absi=(); my @ordo=(); my $cumul=0;
-    my %yearmonth=();
-    my $mincursor='';
-    my $maxcursor='';
-    foreach my $dateuser (sort keys %DateAuthor) {  # By ascending date
-        my ($date,$user)=split(/\s+/,$dateuser);
-        if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
-        	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-        		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
-                    my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
-                    $yearmonth{"$1$2"}+=int($add);
-                    $yearmonth{"$1$2"}+=int($del);
-                }
-            }
-            if (! $mincursor) { $mincursor="$1$2"; }
-            $maxcursor="$1$2";
-        }
-    }
-    # Define absi and ordo and complete holes
-    my $cursor=$mincursor;
-    do {
-        $cumul+=$yearmonth{$cursor};
-        push @ordo, $cumul;
-        push @absi, substr($cursor,0,4)."-".substr($cursor,4,2);
-        $cursor=~/(\d\d\d\d)(\d\d)/;
-        $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
-    }
-    until ($cursor > $maxcursor);
     # Build graph
     my $pngfile="${PROG}_${Module}_codelines.png";
     my @data = ([@absi],[@ordo]);
     my $graph = GD::Graph::lines->new(640, 240);
     $graph->set( 
           #title             => 'Some simple graph',
-          transparent       =>1,
-          x_label           =>'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
-          y_label           =>'Code lines', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, y_tick_number =>10, #y_number_format   => "%06d",
-          boxclr            =>$color_lightgrey,
-          fgclr             =>$color_grey,
-          line_types        =>[1, 2, 3],
+          transparent       => 1,
+          x_label           => 'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
+          y_label           => 'Code lines', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, y_tick_number =>10, #y_number_format   => "%06d",
+          boxclr            => $color_lightgrey,
+          fgclr             => $color_grey,
+          line_types        => [1, 2, 3],
           dclrs             => [ qw(blue green pink blue) ]
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
@@ -1187,7 +1205,7 @@ if (scalar keys %nbcommit > 1) {
     }
     else {
         my $MAXABS=12;
-        # TODO lmité à 5
+        # TODO limit to 5
         my $col;
         # Build graph
         my $pngfilenbcommit="${PROG}_${Module}_developerscommit.png";
@@ -1230,6 +1248,31 @@ if (scalar keys %nbcommit > 1) {
         print "<tr><td colspan=\"7\"><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
     }
 }
+
+#        # Build graph
+#        my $pngfile="${PROG}_${Module}_codelinesbyuser.png";
+#        my @data = ([@absi],[ map{ @{$ordonbcommituser{$_}} } (keys %ordonbcommituser) ] );
+#        my $graph = GD::Graph::bars->new(640, 240);
+#        $graph->set( 
+#              #title             => 'Some simple graph',
+#              transparent       => 1,
+#              x_label           => 'Month', x_label_position =>0.5, x_label_skip =>6, x_all_ticks =>1, x_long_ticks =>0, x_ticks =>1,
+#              y_label           => 'Number of commits', y_min_value =>0, y_label_skip =>1, y_long_ticks =>1, #y_number_format   => "%06d",
+#              textclr           => $color_commit,
+#              boxclr            => $color_lightgrey,
+#              fgclr             => $color_grey,
+#              dclrs             => [ $color_commit ],
+#              accentclr         => "#444444",
+#              #borderclrs        => [ qw(blue green pink blue) ],
+#        ) or die $graph->error;
+#        my $gd = $graph->plot(\@data) or die $graph->error;
+#        open(IMG, ">$pngfile") or die $!;
+#        binmode IMG;
+#        print IMG $gd->png;
+#        close IMG;
+#        # End build graph
+#        print "<tr><td colspan=\"7\"><img src=\"$pngfile\" border=\"0\"></td></tr>\n";
+
 print <<EOF;
 </table></td></tr></table><br />
 
