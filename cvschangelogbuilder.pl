@@ -37,20 +37,20 @@ my %filesym=();
 my $fileformat='';
 my $filerevision='';
 my $filedate='';
-my $fileauthor='';
+my $fileuser='';
 my $filestate='';
 my $filechange='';
 my $filelineadd=0;
 my $filelinedel=0;
 my $filelinechange=0;
 my $filelog='';
-my $oldfiledayauthor='';
+my $oldfiledayuser='';
 my $oldfilelog='';
 my $EXTRACTFILENAME="^RCS file: (.+)";
 my $EXTRACTSYMBOLICNAMEAREA="symbolic names:";
 my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
-my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
+my $EXTRACTFILEDATEUSERSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs";
 my $COMP="";    # Do no use compression because returned bugged rlog files for some servers/clients.
 my $ViewCvsUrl="";
@@ -65,29 +65,29 @@ my %maxincludedver=();
 my %minexcludedver=();
 my %Cache=();
 # For output by date
-my %DateAuthor=();
-my %DateAuthorLog=();
-my %DateAuthorLogFileRevState=();
-my %DateAuthorLogFileRevLine=();
-my %HourAuthor=();
+my %DateUser=();
+my %DateUserLog=();
+my %DateUserLogFileRevState=();
+my %DateUserLogFileRevLine=();
+my %HourUser=();
 # For output by file
 my %FilesLastVersion=();
 my %FilesChangeDate=();
-my %FilesChangeAuthor=();
+my %FilesChangeUser=();
 my %FilesChangeState=();
 my %FilesChangeLog=();
 # For output by log
 my $LGMAXLOG=400;
 my %LogChange=();
 my %LogChangeDate=();
-my %LogChangeAuthor=();
+my %LogChangeUser=();
 my %LogChangeState=();
-# For output by author
-my %AuthorChangeCommit=();
-my %AuthorChangeLast=();
-my %AuthorChangeLineAdd=();
-my %AuthorChangeLineDel=();
-my %AuthorChangeLineChange=();
+# For output by user
+my %UserChangeCommit=();
+my %UserChangeLast=();
+my %UserChangeLineAdd=();
+my %UserChangeLineDel=();
+my %UserChangeLineChange=();
 # For html report output
 my $MAXLASTLOG=500;
 
@@ -220,17 +220,17 @@ sub LoadDataInMemory {
 	}
 	
 	# All infos were found. We can process record
-	debug(">>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileauthor - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
+	debug(">>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
 	
 	# For output by date
 	if ($Output =~ /bydate/ || $Output =~ /forrpm/ || $Output =~ /buildhtmlreport/) {
 		$filedate=~/(\d\d\d\d\d\d\d\d)\s(\d\d)/;
 		my $fileday=$1;
 		my $filehour=$2;
-		$HourAuthor{"$filehour $fileauthor"}++;
-		$DateAuthor{"$fileday $fileauthor"}++;
-		$DateAuthorLog{"$fileday $fileauthor"}{$newfilelog}++;
-		$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
+		$HourUser{"$filehour $fileuser"}++;
+		$DateUser{"$fileday $fileuser"}++;
+		$DateUserLog{"$fileday $fileuser"}{$newfilelog}++;
+		$DateUserLogFileRevState{"$fileday $fileuser"}{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
 		if ($newfilestate eq 'removed') {
 			# Change a state of a revision from "changed" into "added" when previous revision was "removed"
 			my $filerevisionnext=$filerevision;
@@ -238,9 +238,9 @@ sub LoadDataInMemory {
 				my $newver=int($1)+1;
 				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
-			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^changed$/) {
+			if ($DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^changed$/) {
 				debug("Correct next version of $newfilename $filerevisionnext ($filerevisionnext should be 'added_forced' instead of 'changed')",3);
-				$DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"}="added_forced";
+				$DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"}="added_forced";
 			}
 		}
 		# When a version file does not exists in end, all versions are at state 'removed'.
@@ -251,21 +251,21 @@ sub LoadDataInMemory {
 				my $newver=int($1)+1;
 				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
-			if ($DateAuthorLogFileRevState{$oldfiledayauthor}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^(removed|changed_forced)$/) {
+			if ($DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^(removed|changed_forced)$/) {
 				debug("Correct version of $newfilename $filerevision ($filerevision should be 'changed_forced' instead of 'removed')",3);
-				$DateAuthorLogFileRevState{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}='changed_forced';	# with _forced to not be change again by previous test
+				$DateUserLogFileRevState{"$fileday $fileuser"}{$newfilelog}{"$newfilename $filerevision"}='changed_forced';	# with _forced to not be change again by previous test
 			}
 		}
 		# Var used to retrieve easily the revision already read just before the one processed in this function
-		$oldfiledayauthor="$fileday $fileauthor";
+		$oldfiledayuser="$fileday $fileuser";
 		$oldfilelog="$newfilelog";
 
 		my $filechangebis=$filechange; $filechangebis=~s/\-/ \-/;
 		if ($fileformat ne 'b') {
-		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}=$filechangebis;
+		    $DateUserLogFileRevLine{"$fileday $fileuser"}{$newfilelog}{"$newfilename $filerevision"}=$filechangebis;
 		}
 		else {
-		    $DateAuthorLogFileRevLine{"$fileday $fileauthor"}{$newfilelog}{"$newfilename $filerevision"}='binary';
+		    $DateUserLogFileRevLine{"$fileday $fileuser"}{$newfilelog}{"$newfilename $filerevision"}='binary';
 		}
 	}
 	
@@ -273,7 +273,7 @@ sub LoadDataInMemory {
 	if ($Output =~ /byfile/ || $Output =~ /buildhtmlreport/) {
 		if (! $FilesLastVersion{$newfilename}) { $FilesLastVersion{$newfilename}=$filerevision; }	# Save 'last' file version
 		$FilesChangeDate{$newfilename}{$filerevision}=$filedate;
-		$FilesChangeAuthor{$newfilename}{$filerevision}=$fileauthor;
+		$FilesChangeUser{$newfilename}{$filerevision}=$fileuser;
 		$FilesChangeState{$newfilename}{$filerevision}=$newfilestate;
 		$FilesChangeLog{$newfilename}{$filerevision}=$newfilelog;
 	}
@@ -282,17 +282,17 @@ sub LoadDataInMemory {
 	if ($Output =~ /bylog/ || $Output =~ /buildhtmlreport/) {
 		$LogChange{$newfilelog}=1;
 		$LogChangeDate{$newfilelog}{"$newfilename $filerevision"}=$filedate;
-		$LogChangeAuthor{$newfilelog}{"$newfilename $filerevision"}=$fileauthor;
+		$LogChangeUser{$newfilelog}{"$newfilename $filerevision"}=$fileuser;
 		$LogChangeState{$newfilelog}{"$newfilename $filerevision"}=$newfilestate;
 	}
 	
 	if ($Output =~ /^buildhtmlreport/) {
-	    if (! $AuthorChangeLast{$fileauthor} || int($AuthorChangeLast{$fileauthor}) < int($filedate)) { $AuthorChangeLast{$fileauthor}=$filedate; }
-	    $AuthorChangeCommit{$fileauthor}{$filename}++;
+	    if (! $UserChangeLast{$fileuser} || int($UserChangeLast{$fileuser}) < int($filedate)) { $UserChangeLast{$fileuser}=$filedate; }
+	    $UserChangeCommit{$fileuser}{$filename}++;
 	    if ($fileformat ne 'b') {
-	        $AuthorChangeLineAdd{$fileauthor}+=$filelineadd;
-	        $AuthorChangeLineDel{$fileauthor}+=$filelinedel;
-	        $AuthorChangeLineChange{$fileauthor}+=$filelinechange;
+	        $UserChangeLineAdd{$fileuser}+=$filelineadd;
+	        $UserChangeLineDel{$fileuser}+=$filelinedel;
+	        $UserChangeLineChange{$fileuser}+=$filelinechange;
 	    }
 	}
 }
@@ -459,12 +459,15 @@ if ($QueryString =~ /branch=([^\s]+)/i)			{ $Branch=$1; }
 if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
+if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 ($DIR=$0) =~ s/([^\/\\]*)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
-debug("Module: $Module");
-debug("Output: $Output");
+debug("Module    : $Module");
+debug("Output    : $Output");
+debug("ViewCvsUrl: $ViewCvsUrl");
+if ($ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
 my $REPRACINE;
@@ -526,8 +529,10 @@ if ($Help || ! $Output) {
 	writeoutput("  -branch=branchname  To work on another branch than default branch (!)\n");
 	writeoutput("  -tagstart=tagname   To specify start tag version\n");
 	writeoutput("  -tagend=tagend      To specify end tag version\n");
+	writeoutput("  -viewcvsurl=viewcvsurl   File revision in output built by buildhtmlreport\n");
+	writeoutput("                           is a link to viewcvs diff page for file\n");
 	writeoutput("\n");
-	writeoutput("  ! WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n");
+	writeoutput("  !!! WARNING: If you use tagstart and/or tagend, check that tags are in SAME\n");
 	writeoutput("  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n");
 	writeoutput("  give the name of the branch, otherwise you will get unpredicable result.\n");
 	writeoutput("\n");
@@ -761,32 +766,32 @@ while (<RLOGFILE>) {
 			# No revision found
 			$waitfor="filename";
 			debug(" No revision found. Waiting for next $waitfor.",2);
-			$fileformat=''; $filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$fileformat=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /$EXTRACTFILEVERSION/i) {
 			# We found a new revision number
 			$filerevision=$1;
-			$waitfor="dateauthorstate";
+			$waitfor="dateuserstate";
 			debug("Found a new revision number $filerevision",2);
 		}
 		next;
 	}
 
-	# Wait for date and author of revision
-	if ($waitfor eq "dateauthorstate") {
-		if ($line =~ /$EXTRACTFILEDATEAUTHORSTATE/i) {
-			# We found date/author line
-			$filedate=$1; $fileauthor=$2; $filestate=$3; $filechange=$4;
+	# Wait for date and user of revision
+	if ($waitfor eq "dateuserstate") {
+		if ($line =~ /$EXTRACTFILEDATEUSERSTATE/i) {
+			# We found date/user line
+			$filedate=$1; $fileuser=$2; $filestate=$3; $filechange=$4;
 			$filedate =~ s/\///g;
 			$filelineadd=0; $filelinedel=0; $filelinechange=0;
 			$filechange =~ s/.*([\+\-]\d+)\s+([\+\-]\d+).*/$1$2/g;
             $filelineadd=int($1); $filelinedel=(-int($2));
 		    if ($filelineadd>=$filelinedel) { $filelineadd-=$filelinedel; $filelinechange=$filelinedel; $filelinedel=0; }
 		    else { $filelinedel-=$filelineadd; $filelinechange=$filelineadd; $filelineadd=0; }
-			$filedate =~ s/[\s;]+$//; $fileauthor =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
+			$filedate =~ s/[\s;]+$//; $fileuser =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
 			$waitfor="log";
-			debug("Found a new date/author/state/lines $filedate $fileauthor $filestate $filelineadd $filelinedel $filelinechange",2);
+			debug("Found a new date/user/state/lines $filedate $fileuser $filestate $filelineadd $filelinedel $filelinechange",2);
 		}
 		next;
 	}
@@ -799,7 +804,7 @@ while (<RLOGFILE>) {
 			# Load all data for this revision file in memory
 			LoadDataInMemory();
 			debug(" Revision info are stored. Waiting for next $waitfor.",2);
-			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /^=====/) {
@@ -807,7 +812,7 @@ while (<RLOGFILE>) {
 			# Load all data for this revision file in memory
 			LoadDataInMemory();
 			debug(" Revision info are stored. Waiting for next $waitfor.",2);
-			$filedate=''; $fileauthor=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		# Line is log
@@ -911,11 +916,11 @@ EOF
 
 # For output by date
 if ($Output =~ /bydate$/ || $Output =~ /forrpm$/) {
-	if (scalar keys %DateAuthor) {
-		foreach my $dateuser (reverse sort keys %DateAuthor) {
+	if (scalar keys %DateUser) {
+		foreach my $dateuser (reverse sort keys %DateUser) {
 			my $firstlineprinted=0;
-			foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-				foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+			foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
+				foreach my $revision (sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
 					$revision=~/(.*)\s([\d\.]+)/;
 					my ($file,$version)=($1,$2);
 					if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
@@ -925,7 +930,7 @@ if ($Output =~ /bydate$/ || $Output =~ /forrpm$/) {
 						else { print FormatDate($dateuser)."\n"; }
 						$firstlineprinted=1;
 					}
-					my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$revision};
+					my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$revision};
 					$state =~ s/_forced//;
 					if ($Output !~ /forrpm$/) {
 						print "\t* ".ExcludeRepositoryFromPath($file)." $version ($state):\n";
@@ -962,7 +967,7 @@ if ($Output =~ /byfile$/) {
 					$firstlineprinted=1;
 				}
 				printf ("\t* %-16s ",$version." (".$FilesChangeState{$file}{$version}.")");
-				print FormatDate($FilesChangeDate{$file}{$version})."\t$FilesChangeAuthor{$file}{$version}\n";
+				print FormatDate($FilesChangeDate{$file}{$version})."\t$FilesChangeUser{$file}{$version}\n";
 				my $logcomment=$FilesChangeLog{$file}{$version};
 				chomp $logcomment;
 				$logcomment =~ s/\r$//;
@@ -996,7 +1001,7 @@ if ($Output =~ /bylog$/) {
 					$firstlineprinted=1;
 				}
 				$file=ExcludeRepositoryFromPath($file);
-				print "\t* ".FormatDate($LogChangeDate{$logcomment}{$revision})." $LogChangeAuthor{$logcomment}{$revision}\t $file $version ($LogChangeState{$logcomment}{$revision})\n";
+				print "\t* ".FormatDate($LogChangeDate{$logcomment}{$revision})." $LogChangeUser{$logcomment}{$revision}\t $file $version ($LogChangeState{$logcomment}{$revision})\n";
 			}
 			if ($firstlineprinted) { print "\n"; }
 		}	
@@ -1023,37 +1028,72 @@ if ($Output =~ /buildhtmlreport$/) {
         $errorstringbars=($@?"Error: $@":"Error: Need Perl module GD::Graph::bars");
     }
 
-    my $color_commit="#9988EE";
-    my $color_file="#AA88BB";
+
+    
+    
+ 
+ 
+    my $color_user="#FFF0E0";
+    my $color_commit="#B0A0DD"; # my $color_commit="#9988EE";
+    my $color_commit2="#E0D8F0";
+    my $color_file="#AA88BB";   # my $color_file="#AA88BB";
+    my $color_lines="#E0D8F0";
+    my $color_lines2="#EFE2FF";
+    my $color_last="#A8C0A8";   #   my $color_last="#88A495";
+
     my $color_lightgrey="#F0F0F0";
     my $color_grey="#888888";
-    my $color_last="#88A495";
-    
-    # Made some calculation on commits by author
+
+    # Made some calculation on commits by user
     my %nbcommit=(); my %nbfile=();
-    my $nbtotalcommit=0; my $nbtotalfile=0;
-    foreach my $key (sort keys %AuthorChangeCommit) {
-        foreach my $file (keys %{$AuthorChangeCommit{$key}}) {
-           $nbcommit{$key}+=$AuthorChangeCommit{$key}{$file};
-           $nbfile{$key}++;
-           $nbtotalcommit+=$AuthorChangeCommit{$key}{$file};
+    my $nbtotalfile=0;
+    foreach my $user (sort keys %UserChangeCommit) {
+        foreach my $file (keys %{$UserChangeCommit{$user}}) {
+           $nbcommit{$user}+=$UserChangeCommit{$user}{$file};
+           $nbfile{$user}++;
            $nbtotalfile++;
         }
     }
 
     # Made some calculation on state
+    my $LastCommitDate=0;
     my %TotalCommitByState=('added'=>0,'changed'=>0,'removed'=>0);
-    foreach my $dateuser (reverse sort keys %DateAuthor) {
-        my ($date,$user)=split(/\s+/,$dateuser);
-    	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-    		foreach my $filerevision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+    my %TotalCommitMonthByState=('added'=>0,'changed'=>0,'removed'=>0);
+    my %TotalCommitDayByState=('added'=>0,'changed'=>0,'removed'=>0);
+    my %TotalFile=();
+    my %TotalFileMonth=();
+    my %TotalFileDay=();
+    my %TotalUser=();
+    my %TotalUserMonth=();
+    my %TotalUserDay=();
+    foreach my $dateuser (reverse sort keys %DateUser) {
+        $dateuser=~/(\d\d\d\d)(\d\d)(\d\d)\s+(\S+)/;
+        my ($year,$month,$day,$user)=($1,$2,$3,$4);
+        if ($dateuser > $LastCommitDate) { $LastCommitDate="$year$month$day"; }
+    	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
+    		foreach my $filerevision (sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
                 my ($file,$revision)=split(/\s+/,$filerevision);
-    			my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$filerevision};
+    			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
     			$state =~ s/_forced//;
                 $TotalCommitByState{$state}++;
+                $TotalFile{$file}++;
+                $TotalUser{$user}++;
+                if ($year == $nowyear && $month == $nowmonth) {
+                    $TotalCommitMonthByState{$state}++;
+                    $TotalFileMonth{$file}++;
+                    $TotalUserMonth{$user}++;
+                }
+                if ($year == $nowyear && $month == $nowmonth && $day == $nowday) {
+                    $TotalCommitDayByState{$state}++;
+                    $TotalFileDay{$file}++;
+                    $TotalUserDay{$user}++;
+                }
             }
         }
     }
+    my $TotalCommit=$TotalCommitByState{'added'}+$TotalCommitByState{'changed'}+$TotalCommitByState{'removed'};
+    my $TotalCommitMonth=$TotalCommitMonthByState{'added'}+$TotalCommitMonthByState{'changed'}+$TotalCommitMonthByState{'removed'};
+    my $TotalCommitDay=$TotalCommitDayByState{'added'}+$TotalCommitDayByState{'changed'}+$TotalCommitDayByState{'removed'};
 
     my @absi=(); my @ordo=(); my %ordonbcommituser=();
     my $cumul=0; my %cumulnbcommituser=();
@@ -1062,12 +1102,12 @@ if ($Output =~ /buildhtmlreport$/) {
     my %yearmonth=(); my %yearmonthusernbcommit=();
     my $mincursor='';
     my $maxcursor='';
-    foreach my $dateuser (sort keys %DateAuthor) {  # By ascending date
+    foreach my $dateuser (sort keys %DateUser) {  # By ascending date
         my ($date,$user)=split(/\s+/,$dateuser);
         if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
-        	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
-        		foreach my $revision (sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
-                    my ($add,$del)=split(/\s+/,$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision});
+        	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
+        		foreach my $revision (sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
+                    my ($add,$del)=split(/\s+/,$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision});
                     $yearmonth{"$1$2"}+=int($add);
                     $yearmonth{"$1$2"}+=int($del);
                     $yearmonthusernbcommit{$user}{"$1$2"}++;
@@ -1109,34 +1149,44 @@ print <<EOF;
 <tr><td colspan="2">
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"aws\" colspan=\"3\"><b>$Module</b></td></tr>";
+print "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" colspan=\"3\"><b>$Module</b></td></tr>";
 
-print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"3\"><b>$rangestring</b></td></tr>";
-print "<td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"3\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
+print "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\" colspan=\"3\"><b>$rangestring</b></td></tr>";
+print "<td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\" colspan=\"3\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
 
-print "<tr><td class=\"aws_title\">Indicator</td><td class=\"aws_title\" width=\"180\">All over time</td><td class=\"aws_title\" width=\"180\">This month</td><td class=\"aws_title\" width=\"180\">Today</td></tr>";
+print "<tr><td class=\"aws_title\" colspan=2>Indicator</td><td class=\"aws_title\" width=\"180\">All over time</td><td class=\"aws_title\" width=\"180\">This month</td><td class=\"aws_title\" width=\"180\">Today</td></tr>";
 
-print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Number of developers</td>";
-print "<td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td>";
-print "<td width=\"100\">&nbsp;</td>";
-print "<td width=\"100\">&nbsp;</td>";
+print "<tr><td class=\"aws\">Number of developers</td><td bgcolor=\"$color_user\" width=\"10\">&nbsp;</td>";
+print "<td width=\"100\">".(scalar keys %TotalUser?"<b>".(scalar keys %TotalUser)."</b>":"0")."</td>";
+print "<td width=\"100\">".(scalar keys %TotalUserMonth?"<b>".(scalar keys %TotalUserMonth)."</b>":"0")."</td>";
+print "<td width=\"100\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
 print "</tr>";
 
-print "<tr><td bgcolor=\"$color_commit\" class=\"aws\">Number of commits</td>";
-print "<td><b>$nbtotalcommit</b></td>";
-print "<td><b>&nbsp;</b></td>";
-print "<td><b>&nbsp;</b></td>";
+print "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\"></td>";
+print "<td>".($TotalCommit?"<b>$TotalCommit</b>":"0")."</td>";
+print "<td>".($TotalCommitMonth?"<b>$TotalCommitMonth</b>":"0")."</td>";
+print "<td>".($TotalCommitDay?"<b>$TotalCommitDay</b>":"0")."</td>";
 print "</tr>";
 
-print "<tr><td>&nbsp;</td>";
-print "<td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file,<br><b>$TotalCommitByState{'changed'}</b> to change existing file,<br><b>$TotalCommitByState{'removed'}</b> to remove file</td>";
-print "<td class=\"aws\">&nbsp;</td>";
-print "<td class=\"aws\">&nbsp;</td>";
+print "<tr><td class=\"aws\" valign=\"top\">Number of commits by status</td><td bgcolor=\"$color_commit2\" class=\"aws\">&nbsp;</td>";
+print "<td valign=\"top\">".($TotalCommitByState{'added'}?"<b>$TotalCommitByState{'added'}</b> to add new file<br>":"").($TotalCommitByState{'changed'}?"<b>$TotalCommitByState{'changed'}</b> to change existing file<br>":"").($TotalCommitByState{'removed'}?"<b>$TotalCommitByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
+print "<td valign=\"top\">".($TotalCommitMonthByState{'added'}?"<b>$TotalCommitMonthByState{'added'}</b> to add new file<br>":"").($TotalCommitMonthByState{'changed'}?"<b>$TotalCommitMonthByState{'changed'}</b> to change existing file<br>":"").($TotalCommitMonthByState{'removed'}?"<b>$TotalCommitMonthByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
+print "<td valign=\"top\">".($TotalCommitDayByState{'added'}?"<b>$TotalCommitDayByState{'added'}</b> to add new file<br>":"").($TotalCommitDayByState{'changed'}?"<b>$TotalCommitDayByState{'changed'}</b> to change existing file<br>":"").($TotalCommitDayByState{'removed'}?"<b>$TotalCommitDayByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
 print "</tr>";
 
-print "<tr><td class=\"aws_title\" colspan=\"4\">&nbsp;</td></tr>";
+print "<tr><td class=\"aws\">Different files commited</td><td bgcolor=\"$color_file\">&nbsp;</td>";
+print "<td>".(scalar keys %TotalFile?"<b>".(scalar keys %TotalFile)."</b>":"0")."</td>";
+print "<td>".(scalar keys %TotalFileMonth?"<b>".(scalar keys %TotalFileMonth)."</b>":"0")."</td>";
+print "<td>".(scalar keys %TotalFileDay?"<b>".(scalar keys %TotalFileDay)."</b>":"0")."</td>";
+print "</tr>";
 
-print "<tr><td bgcolor=\"$color_last\" class=\"aws\">Last commit</td><td class=\"aws\" colspan=\"3\"><b>2004-mm-dd</b> by <b>user</b></td></tr>";
+#print "<tr><td class=\"aws_title\" colspan=\"4\">&nbsp;</td></tr>";
+
+# Last commit
+my $pos=1;
+if ($LastCommitDate >= int("$nowyear${nowmonth}01")) { $pos=2; }
+if ($LastCommitDate >= int("$nowyear$nowmonth$nowday")) { $pos=3; }
+print "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last\">&nbsp;</td><td><b>".($pos==1?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos==2?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos==3?FormatDate($LastCommitDate):"&nbsp;")."</b></td></tr>";
 
 print <<EOF;
 </table></td></tr></table><br />
@@ -1176,7 +1226,7 @@ else {
           boxclr            => $color_lightgrey,
           fgclr             => $color_grey,
           line_types        => [1, 2, 3],
-          dclrs             => [ qw(blue green pink blue) ]
+          dclrs             => [ qw(blue) ]
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
     my $gd = $graph->plot(\@data) or die $graph->error;
@@ -1200,26 +1250,26 @@ print <<EOF;
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
-<table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="$color_last" width="140">Last commit</th><th>&nbsp; </th></tr>
+<table class="aws_data users" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="$color_lines" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="$color_lines2" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="$color_last" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
 
 # BY DEVELOPERS
 #--------------
 
-foreach my $key (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
+foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
     print "<tr><td class=\"aws\">";
-    print $key;
+    print $developer;
     print "</td><td>";
-    print $nbcommit{$key};
+    print $nbcommit{$developer};
     print "</td><td>";
-    print $nbfile{$key};
+    print $nbfile{$developer};
     print "</td><td>";
-    print $AuthorChangeLineAdd{$key}." / ".$AuthorChangeLineChange{$key}." / ".$AuthorChangeLineDel{$key};
+    print $UserChangeLineAdd{$developer}." / ".$UserChangeLineChange{$developer}." / ".$UserChangeLineDel{$developer};
     print "</td><td>";
-    print RoundNumber($AuthorChangeLineAdd{$key}/$nbcommit{$key},1)." / ".RoundNumber($AuthorChangeLineChange{$key}/$nbcommit{$key},1)." / ".RoundNumber($AuthorChangeLineDel{$key}/$nbcommit{$key},1);
+    print RoundNumber($UserChangeLineAdd{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineChange{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineDel{$developer}/$nbcommit{$developer},1);
     print "</td><td>";
-    print FormatDate($AuthorChangeLast{$key},'simple');
+    print FormatDate($UserChangeLast{$developer},'simple');
     print "</td>";
     print "<td>&nbsp;</td>";
     print "</tr>";
@@ -1243,7 +1293,7 @@ if (scalar keys %nbcommit > 1) {
               textclr           => $color_commit,
               transparent       => 1,
               accentclr         => $color_grey,
-              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (1..$MAXABS) ]
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (0..($MAXABS-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">$pngfilenbcommit") or die $!;
@@ -1262,7 +1312,7 @@ if (scalar keys %nbcommit > 1) {
               textclr           => $color_file,
               transparent       => 1,
               accentclr         => $color_grey,
-              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (1..$MAXABS) ]
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">$pngfilefile") or die $!;
@@ -1319,10 +1369,10 @@ if ($errorstringbars) {
 else {
     my @absi=('Mon','Tue','Wed','Thi','Fri','Sat','Sun'); my @ordo=(); my $cumul=0;
     # We need to build array values for chart
-    foreach my $dateuser (sort keys %DateAuthor) {
+    foreach my $dateuser (sort keys %DateUser) {
         my ($date,$user)=split(/\s+/,$dateuser);
         my $dayofweek=&DayOfWeek($date);
-        $ordo[$dayofweek-1]+=$DateAuthor{"$dateuser"};
+        $ordo[$dayofweek-1]+=$DateUser{"$dateuser"};
     }
     # Build graph
     my $pngfile="${PROG}_${Module}_daysofweek.png";
@@ -1369,9 +1419,9 @@ if ($errorstringbars) {
 else {
     my @absi=(0..23); my @ordo=(); my $cumul=0;
     # We need to build array values for chart
-    foreach my $houruser (sort keys %HourAuthor) {
+    foreach my $houruser (sort keys %HourUser) {
         my ($hour,$user)=split(/\s+/,$houruser);
-        $ordo[int($hour)]+=$HourAuthor{"$houruser"};
+        $ordo[int($hour)]+=$HourUser{"$houruser"};
     }
     # Build graph
     my $pngfile="${PROG}_${Module}_hours.png";
@@ -1416,12 +1466,12 @@ EOF
 my $width=140;
 print "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
-foreach my $dateuser (reverse sort keys %DateAuthor) {
+foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
     print "<tr><td valign=\"top\">".FormatDate($date)."</td>";
     print "<td valign=\"top\">".$user."</td>";
     print "<td class=\"aws\">";
-	foreach my $logcomment (sort keys %{$DateAuthorLog{$dateuser}}) {
+	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
         $cursor++;
         my $comment=$logcomment;
 		chomp $comment;
@@ -1429,18 +1479,18 @@ foreach my $dateuser (reverse sort keys %DateAuthor) {
 		foreach my $logline (split(/\n/,$comment)) {
 			print "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
-		foreach my $revision (reverse sort keys %{$DateAuthorLogFileRevState{$dateuser}{$logcomment}}) {
+		foreach my $revision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
 			$revision=~/(.*)\s([\d\.]+)/;
 			my ($file,$version)=($1,$2);
 			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
-			my $state=$DateAuthorLogFileRevState{$dateuser}{$logcomment}{$revision};
+			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$revision};
 			$state =~ s/_forced//;
 			my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
 			print "* ".FormatDiffLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
-			print ($state eq 'added'?" <font color=\"#008822\">".$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
-			print ($state eq 'changed'?" <font color=\"#888888\">".$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
-			print ($state eq 'removed'?" <font color=\"#880000\">".$DateAuthorLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
+			print ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
+			print ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
+			print ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
 			print ")<br>\n";
 		}
         if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
