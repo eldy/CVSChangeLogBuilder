@@ -706,7 +706,7 @@ if ($Help || ! $Output) {
 	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
 	writeoutput("                       this option to avoid log download, for a faster result.\n");
 	writeoutput("  -nodelrlogfile      Once process is finished, you can ask to not remove the\n");
-	writeoutput("                       downloaded log file.\n";
+	writeoutput("                       downloaded log file.\n");
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
 	writeoutput("                           output are links to \"viewcvs\".\n");
