@@ -346,15 +346,34 @@ sub FormatState {
 }
 
 #------------------------------------------------------------------------------
-# Function:      Format a diff link
+# Function:      Format a viewcvs file link
 #------------------------------------------------------------------------------
-sub FormatDiffLink {
+sub FormatCvsFileLink {
 	my $url=shift;
 	my $version=shift;
-    my $string='';
-    if ($ViewCvsUrl) { $string="$ViewCvsUrl$Module/"; }
-    $string.="$url";
     if ($ViewCvsUrl) { 
+        my $string='';
+        $string="$ViewCvsUrl$Module/";
+        $string.="$url";
+        $string.="?rev=".$version;
+    	return "<a href=\"$string\">$url</a>";
+	}
+	else {
+	    return "$url";   
+	}
+}
+
+#------------------------------------------------------------------------------
+# Function:      Format a viewcvs diff link
+#------------------------------------------------------------------------------
+sub FormatCvsDiffLink {
+	my $url=shift;
+	my $version=shift;
+    if ($ViewCvsUrl) { 
+        my $string='';
+        my $label='diff';
+        $string="$ViewCvsUrl$Module/";
+        $string.="$url";
         if (CompareVersionBis($version,"1.1")>0) {
             my $versionprec=DecreaseVersion($version);
             $string.=".diff?r1=".$versionprec;
@@ -363,10 +382,10 @@ sub FormatDiffLink {
         else {
             $string.="?rev=".$version;
         }    
-    	return "<a href=\"$string\">$url</a>";
+    	return "<a href=\"$string\">$label</a>";
 	}
 	else {
-	    return "$string";   
+	    return "$url";   
 	}
 }
 
@@ -434,6 +453,11 @@ sub DecreaseVersion {
 	return "$aint.$adec";
 }
 
+#------------------------------------------------------------------------------
+# Function:      Remove repository path from a full path
+# Input:         a string path
+# Output:        a string path
+#------------------------------------------------------------------------------
 sub ExcludeRepositoryFromPath {
 	my $file=shift;
 	$file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/;
@@ -481,7 +505,7 @@ if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
 debug("Module    : $Module");
 debug("Output    : $Output");
 debug("ViewCvsUrl: $ViewCvsUrl");
-if ($ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
+if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
 my $REPRACINE;
@@ -1030,7 +1054,6 @@ if ($Output =~ /bylog$/) {
 if ($Output =~ /buildhtmlreport$/) {
     writeoutput("Generating HTML report...\n");
 
-
     my ($errorstringlines,$errorstringpie,$errorstringbars)=();
     if (!eval ('require "GD/Graph/lines.pm";')) { 
         $errorstringlines=($@?"Error: $@":"Error: Need Perl module GD::Graph::lines");
@@ -1042,14 +1065,9 @@ if ($Output =~ /buildhtmlreport$/) {
         $errorstringbars=($@?"Error: $@":"Error: Need Perl module GD::Graph::bars");
     }
 
-
-    
-    
- 
- 
     my $color_user="#FFF0E0";
     my $color_commit="#B0A0DD"; # my $color_commit="#9988EE";
-    my $color_commit2="#E0D8F0";
+    my $color_commit2="#C0B0ED";
     my $color_file="#AA88BB";   # my $color_file="#AA88BB";
     my $color_lines="#E0D8F0";
     my $color_lines2="#EFE2FF";
@@ -1060,26 +1078,35 @@ if ($Output =~ /buildhtmlreport$/) {
 
     # Made some calculation on commits by user
     my %nbcommit=(); my %nbfile=();
-    my $nbtotalfile=0;
     foreach my $user (sort keys %UserChangeCommit) {
         foreach my $file (keys %{$UserChangeCommit{$user}}) {
            $nbcommit{$user}+=$UserChangeCommit{$user}{$file};
            $nbfile{$user}++;
-           $nbtotalfile++;
         }
     }
 
     # Made some calculation on state
+    my $TotalFile=0;
+    my %TotalFile=();
+    my %TotalFileMonth=();
+    my %TotalFileDay=();
+    my $TotalCommit=0;
+    my $TotalCommitMonth=0;
+    my $TotalCommitDay=0;
+    my %TotalUser=();
+    my %TotalUserMonth=();
+    my %TotalUserDay=();
+
+    my $TotalLine=0;
+
     my $LastCommitDate=0;
     my %TotalCommitByState=('added'=>0,'changed'=>0,'removed'=>0);
     my %TotalCommitMonthByState=('added'=>0,'changed'=>0,'removed'=>0);
     my %TotalCommitDayByState=('added'=>0,'changed'=>0,'removed'=>0);
-    my %TotalFile=();
-    my %TotalFileMonth=();
-    my %TotalFileDay=();
-    my %TotalUser=();
-    my %TotalUserMonth=();
-    my %TotalUserDay=();
+    my %TotalLineByState=('added'=>0,'changed'=>0,'removed'=>0);
+    my %TotalLineMonthByState=('added'=>0,'changed'=>0,'removed'=>0);
+    my %TotalLineDayByState=('added'=>0,'changed'=>0,'removed'=>0);
+
     foreach my $dateuser (reverse sort keys %DateUser) {
         $dateuser=~/(\d\d\d\d)(\d\d)(\d\d)\s+(\S+)/;
         my ($year,$month,$day,$user)=($1,$2,$3,$4);
@@ -1105,34 +1132,66 @@ if ($Output =~ /buildhtmlreport$/) {
             }
         }
     }
-    my $TotalCommit=$TotalCommitByState{'added'}+$TotalCommitByState{'changed'}+$TotalCommitByState{'removed'};
-    my $TotalCommitMonth=$TotalCommitMonthByState{'added'}+$TotalCommitMonthByState{'changed'}+$TotalCommitMonthByState{'removed'};
-    my $TotalCommitDay=$TotalCommitDayByState{'added'}+$TotalCommitDayByState{'changed'}+$TotalCommitDayByState{'removed'};
-
+    $TotalCommit=$TotalCommitByState{'added'}+$TotalCommitByState{'changed'}+$TotalCommitByState{'removed'};
+    $TotalCommitMonth=$TotalCommitMonthByState{'added'}+$TotalCommitMonthByState{'changed'}+$TotalCommitMonthByState{'removed'};
+    $TotalCommitDay=$TotalCommitDayByState{'added'}+$TotalCommitDayByState{'changed'}+$TotalCommitDayByState{'removed'};
+    $TotalFile=$TotalCommitByState{'added'}-$TotalCommitByState{'removed'};
+    
     my @absi=(); my @ordo=(); my %ordonbcommituser=();
     my $cumul=0; my %cumulnbcommituser=();
 
     # Made some calculation on commit by date, by user
     my %yearmonth=(); my %yearmonthusernbcommit=();
-    my $mincursor='';
-    my $maxcursor='';
+    my $minyearmonth='';
+    my $maxyearmonth='';
     foreach my $dateuser (sort keys %DateUser) {  # By ascending date
         my ($date,$user)=split(/\s+/,$dateuser);
-        if ($date =~ /^(\d\d\d\d)(\d\d)\d\d/) {
+        if ($date =~ /^(\d\d\d\d)(\d\d)(\d\d)/) {
+            my ($year,$month,$day)=($1,$2,$3);
         	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
         		foreach my $revision (sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
                     my ($add,$del)=split(/\s+/,$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision});
-                    $yearmonth{"$1$2"}+=int($add);
-                    $yearmonth{"$1$2"}+=int($del);
-                    $yearmonthusernbcommit{$user}{"$1$2"}++;
+                    my $delta=int($add)+int($del);
+                    $yearmonthusernbcommit{$user}{"$year$month"}++;
+                    $yearmonth{"$year$month"}+=$delta;
+                    if ($delta >=0) {
+                        $TotalLineByState{'added'}+=$delta;
+                        $TotalLineByState{'changed'}+=(int($add)-$delta);
+                    } else {
+                        $TotalLineByState{'removed'}+=$delta;
+                        $TotalLineByState{'changed'}+=(-int($del)+$delta);
+                    }
+                    if ($year == $nowyear && $month == $nowmonth) {
+                        if ($delta >=0) {
+                            $TotalLineMonthByState{'added'}+=$delta;
+                            $TotalLineMonthByState{'changed'}+=(int($add)-$delta);
+                        } else {
+                            $TotalLineMonthByState{'removed'}+=$delta;
+                            $TotalLineMonthByState{'changed'}+=(-int($del)+$delta);
+                        }
+                    }
+                    if ($year == $nowyear && $month == $nowmonth && $day == $nowday) {
+                        if ($delta >=0) {
+                            $TotalLineDayByState{'added'}+=$delta;
+                            $TotalLineDayByState{'changed'}+=(int($add)-$delta);
+                        } else {
+                            $TotalLineDayByState{'removed'}+=$delta;
+                            $TotalLineDayByState{'changed'}+=(-int($del)+$delta);
+                        }
+                    }
                 }
             }
-            if (! $mincursor) { $mincursor="$1$2"; }
-            $maxcursor="$1$2";
+            if ($TotalLineByState{'removed'}==0) { $TotalLineByState{'removed'}="-0"; }
+            if ($TotalLineMonthByState{'removed'}==0) { $TotalLineMonthByState{'removed'}="-0"; }
+            if ($TotalLineDayByState{'removed'}==0) { $TotalLineDayByState{'removed'}="-0"; }
+            if (! $minyearmonth) { $minyearmonth="$year$month"; }
+            $maxyearmonth="$year$month";
         }
     }
+    $TotalLine=$TotalLineByState{'added'}+$TotalLineByState{'removed'};
+
     # Define absi and ordo and complete holes
-    my $cursor=$mincursor;
+    my $cursor=$minyearmonth;
     do {
         push @absi, substr($cursor,0,4)."-".substr($cursor,4,2);
         $cumul+=$yearmonth{$cursor};
@@ -1144,7 +1203,7 @@ if ($Output =~ /buildhtmlreport$/) {
         $cursor=~/(\d\d\d\d)(\d\d)/;
         $cursor=sprintf("%04d%02d",(int($1)+(int($2)>=12?1:0)),(int($2)>=12?1:(int($2)+1)));
     }
-    until ($cursor > $maxcursor);
+    until ($cursor > $maxyearmonth);
 
 print <<EOF;
 
@@ -1157,55 +1216,81 @@ print <<EOF;
 </td></tr></table>
 <br />
 
-<a name="summary">&nbsp;</a><br />
+<a name="parameters">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0">
+<tr><td class="aws_title" width="70%">Analysis' parameters</td><td class="aws_blank">&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data parameters" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+
+print "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
+print "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS root used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
+print "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
+print "<tr><td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
+
+print <<EOF;
+</table></td></tr></table><br />
+
+<a name="summary">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank">&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-print "<tr><td class=\"aws\" width=\"200\" colspan=2>Project module name</td><td class=\"aws\" colspan=\"3\"><b>$Module</b></td></tr>";
 
-print "<tr><td class=\"aws\" colspan=2>Range analysis</td><td class=\"aws\" colspan=\"3\"><b>$rangestring</b></td></tr>";
-print "<td class=\"aws\" colspan=2>Date analysis</td><td class=\"aws\" colspan=\"3\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
+print "<tr bgcolor=\"#FFF0E0\"><th colspan=\"2\">Current status indicators</th><th width=\"180\">Value</th><th width=\"180\">&nbsp;</th><th width=\"180\">&nbsp;</th></tr>\n";
 
-print "<tr><td class=\"aws_title\" colspan=2>Indicator</td><td class=\"aws_title\" width=\"180\">All over time</td><td class=\"aws_title\" width=\"180\">This month</td><td class=\"aws_title\" width=\"180\">Today</td></tr>";
+print "<tr><td class=\"aws\">Files currently in repository</td><td bgcolor=\"$color_file\" width=\"10\">&nbsp;</td>";
+print "<td width=\"180\" align=\"center\">".($TotalFile>0?"<b>$TotalFile</b>":"0")."</td>";
+print "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
+print "</tr>\n";
+
+print "<tr><td class=\"aws\">Lines of code currently in repository (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
+print "<td width=\"180\">".($TotalLine>0?"<b>$TotalLine</b>":"0")."</td>";
+print "<td width=\"360\" colspan=\"2\">&nbsp;</td>";
+print "</tr>\n";
+
+
+print "<tr bgcolor=\"#FFF0E0\"><th width=\"200\" colspan=\"2\">Activity indicators</th><th width=\"180\">From start</th><th width=\"180\">This month</th><th width=\"180\">Today</th></tr>\n";
 
 print "<tr><td class=\"aws\">Number of developers</td><td bgcolor=\"$color_user\" width=\"10\">&nbsp;</td>";
-print "<td width=\"100\">".(scalar keys %TotalUser?"<b>".(scalar keys %TotalUser)."</b>":"0")."</td>";
-print "<td width=\"100\">".(scalar keys %TotalUserMonth?"<b>".(scalar keys %TotalUserMonth)."</b>":"0")."</td>";
-print "<td width=\"100\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
-print "</tr>";
+print "<td width=\"180\">".(scalar keys %TotalUser?"<b>".(scalar keys %TotalUser)."</b>":"0")."</td>";
+print "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>".(scalar keys %TotalUserMonth)."</b>":"0")."</td>";
+print "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
+print "</tr>\n";
 
 print "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\"></td>";
 print "<td>".($TotalCommit?"<b>$TotalCommit</b>":"0")."</td>";
 print "<td>".($TotalCommitMonth?"<b>$TotalCommitMonth</b>":"0")."</td>";
 print "<td>".($TotalCommitDay?"<b>$TotalCommitDay</b>":"0")."</td>";
-print "</tr>";
+print "</tr>\n";
 
 print "<tr><td class=\"aws\" valign=\"top\">Number of commits by status</td><td bgcolor=\"$color_commit2\" class=\"aws\">&nbsp;</td>";
 print "<td valign=\"top\">".($TotalCommitByState{'added'}?"<b>$TotalCommitByState{'added'}</b> to add new file<br>":"").($TotalCommitByState{'changed'}?"<b>$TotalCommitByState{'changed'}</b> to change existing file<br>":"").($TotalCommitByState{'removed'}?"<b>$TotalCommitByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
 print "<td valign=\"top\">".($TotalCommitMonthByState{'added'}?"<b>$TotalCommitMonthByState{'added'}</b> to add new file<br>":"").($TotalCommitMonthByState{'changed'}?"<b>$TotalCommitMonthByState{'changed'}</b> to change existing file<br>":"").($TotalCommitMonthByState{'removed'}?"<b>$TotalCommitMonthByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
 print "<td valign=\"top\">".($TotalCommitDayByState{'added'}?"<b>$TotalCommitDayByState{'added'}</b> to add new file<br>":"").($TotalCommitDayByState{'changed'}?"<b>$TotalCommitDayByState{'changed'}</b> to change existing file<br>":"").($TotalCommitDayByState{'removed'}?"<b>$TotalCommitDayByState{'removed'}</b> to remove file":"")."&nbsp;</td>";
-print "</tr>";
+print "</tr>\n";
 
 print "<tr><td class=\"aws\">Different files commited</td><td bgcolor=\"$color_file\">&nbsp;</td>";
 print "<td>".(scalar keys %TotalFile?"<b>".(scalar keys %TotalFile)."</b>":"0")."</td>";
 print "<td>".(scalar keys %TotalFileMonth?"<b>".(scalar keys %TotalFileMonth)."</b>":"0")."</td>";
 print "<td>".(scalar keys %TotalFileDay?"<b>".(scalar keys %TotalFileDay)."</b>":"0")."</td>";
-print "</tr>";
+print "</tr>\n";
 
-#print "<tr><td class=\"aws_title\" colspan=\"4\">&nbsp;</td></tr>";
+print "<tr><td class=\"aws\">Lines added / modified / removed (on non binary files only)</td><td bgcolor=\"$color_lines\" width=\"10\">&nbsp;</td>";
+print "<td width=\"180\">".(scalar keys %TotalUser?"<b>":"")."+$TotalLineByState{'added'} / $TotalLineByState{'changed'} / $TotalLineByState{'removed'}".(scalar keys %TotalUser?"</b>":"")."</td>";
+print "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>":"")."+$TotalLineMonthByState{'added'} / $TotalLineMonthByState{'changed'} / $TotalLineMonthByState{'removed'}".(scalar keys %TotalUserMonth?"</b>":"")."</td>";
+print "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>":"")."+$TotalLineDayByState{'added'} / $TotalLineDayByState{'changed'} / $TotalLineDayByState{'removed'}".(scalar keys %TotalUserDay?"</b>":"")."</td>";
+print "</tr>\n";
 
 # Last commit
 my $pos=1;
 if ($LastCommitDate >= int("$nowyear${nowmonth}01")) { $pos=2; }
 if ($LastCommitDate >= int("$nowyear$nowmonth$nowday")) { $pos=3; }
-print "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last\">&nbsp;</td><td><b>".($pos==1?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos==2?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos==3?FormatDate($LastCommitDate):"&nbsp;")."</b></td></tr>";
+print "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last\">&nbsp;</td><td><b>".($pos>=1?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=2?FormatDate($LastCommitDate):"&nbsp;")."</b></td><td><b>".($pos>=3?FormatDate($LastCommitDate):"&nbsp;")."</b></td></tr>\n";
 
 print <<EOF;
 </table></td></tr></table><br />
-
-<br />
 
 <a name="linesofcode">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1257,8 +1342,6 @@ print "</table>\n";
 print <<EOF;
 </center>
 </td></tr></table></td></tr></table><br />
-
-<br />
 
 <a name="developpers">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1365,8 +1448,6 @@ if (scalar keys %nbcommit > 1) {
 print <<EOF;
 </table></td></tr></table><br />
 
-<br />
-
 <a name="daysofweek">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Activity by days of week</td><td class="aws_blank"></td></tr>
@@ -1416,7 +1497,6 @@ else {
 print <<EOF;
 </table></td></tr></table><br />
 
-<br />
 <a name="hours">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Activity by hours</td><td class="aws_blank"></td></tr>
@@ -1465,8 +1545,6 @@ else {
 print <<EOF;
 </table></td></tr></table><br />
 
-<br />
-
 <a name="lastlogs">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Last commit logs</td><td class="aws_blank">&nbsp;</td></tr>
@@ -1493,18 +1571,23 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		foreach my $logline (split(/\n/,$comment)) {
 			print "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
-		foreach my $revision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
-			$revision=~/(.*)\s([\d\.]+)/;
+		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
+			$filerevision=~/(.*)\s([\d\.]+)/;
 			my ($file,$version)=($1,$2);
 			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
-			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$revision};
+			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
 			$state =~ s/_forced//;
 			my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
-			print "* ".FormatDiffLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
-			print ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
-			print ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
-			print ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$revision}."</font>":"");
+			print "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file),$version)." $version (".FormatState($state);
+			print ($state eq 'added'?" <font color=\"#008822\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+			print ($state eq 'changed'?" <font color=\"#888888\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+			print ($state eq 'removed'?" <font color=\"#880000\">".$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision}."</font>":"");
+            if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
+                if ($state eq 'changed') {
+			        print ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
+			    }
+            }
 			print ")<br>\n";
 		}
         if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
