@@ -315,6 +315,7 @@ sub LoadDataInMemory {
             }
             if ($errorstring) { 
                 warning("Failed to execute command: $command: $errorstring");
+                print CACHE "$relativefilename $filerevisiontoscan ERROR $errorstring\n";
             }
             else {
                 debug("Nb of line : $nbline",2);
@@ -609,7 +610,7 @@ sub DayOfWeek {
 #-------------------------------------------------------
 # MAIN
 #-------------------------------------------------------
-my $QueryString=''; for (0..@ARGV-1) { $QueryString .= "$ARGV[$_] "; }
+my $QueryString=join(' ', @ARGV);
 if ($QueryString =~ /debug=(\d+)/i)    			{ $Debug=$1; }
 if ($QueryString =~ /m(?:odule|)=([^\s]+)/i)	{ $Module=$1; }
 if ($QueryString =~ /output=([^\s]+)/i)   		{ $Output=$1; }
@@ -858,8 +859,10 @@ if ($Output =~ /^buildhtmlreport/) {
         while (<CACHE>) {
             chomp $_; s/\r$//;
             my ($file,$revision,$nbline,undef)=split(/\s+/,$_);
-            debug(" Load cache entry for ($file,$revision)=$nbline",2);
-            $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
+            if ($nbline ne 'ERROR') {
+                debug(" Load cache entry for ($file,$revision)=$nbline",2);
+                $Cache{$file}{$revision}=$nbline;   # If duplicate records, the last one will be used
+            }
         }
         close CACHE;
     } else {
@@ -1689,7 +1692,7 @@ EOF
 #---------
 
 my $width=140;
-writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developers</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th class=\"aws\">Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
 foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
