@@ -639,6 +639,7 @@ $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
 debug("Module    : $Module");
 debug("Output    : $Output");
 debug("OutputDir : $OutputDir");
+debug("Branch    : $Branch");
 debug("ViewCvsUrl: $ViewCvsUrl");
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
@@ -819,6 +820,8 @@ $RepositoryPath=$CvsRoot; $RepositoryPath=~s/.*:([^:]+)/$1/;
 writeoutput(ucfirst($PROG)." launched for directory repository: $RepositoryPath\n",1);
 $RepositoryPath=quotemeta($RepositoryPath);
 
+writeoutput(ucfirst($PROG)." launched for Branch: ".($Branch?"$Branch":"HEAD")."\n",1);
+
 # Set use of ssh or not
 if ($UseSsh) {
 	writeoutput("Set CVS_RSH=ssh\n",1);
@@ -845,7 +848,7 @@ if (! $RLogFile) {
 		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -r${Branch} $Module";
 	}
 	else {
-		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
+		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -b ".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
 	writeoutput("Downloading temporary cvs rlog file '$TmpFile'\n",1);
 	writeoutput("with command '$command'\n",1);
@@ -1027,10 +1030,11 @@ if ($Output =~ /^buildhtmlreport/) {
 
 # BUILD OUTPUT
 #------------------------
+my $OutputRootFile="${PROG}_".($Branch?"(${Branch})_$Module":"$Module");
 
 # Start of true output
 if ($OutputDir) {
-    open(FILE,">${OutputDir}${PROG}_$Module.html") || error("Error: Failed to open file '${PROG}_$Module.html' for output in directory '${OutputDir}'.");
+    open(FILE,">${OutputDir}${OutputRootFile}.html") || error("Error: Failed to open file '${OutputRootFile}.html' for output in directory '${OutputDir}'.");
 }
 
 writeoutput("\nBuild output for option '$Output'\n",1);
@@ -1491,7 +1495,7 @@ else {
     my $MAXABS=12;  # TODO limit to 10
     my $col="#706880"; $col=~s/#//;
     # Build graph
-    my $pngfile="${PROG}_${Module}_codelines.png";
+    my $pngfile="${OutputRootFile}_codelines.png";
     my @data = ([@absi],[@ordo]);
     my $graph = GD::Graph::lines->new(640, 240);
     $graph->set( 
@@ -1560,7 +1564,7 @@ if (scalar keys %nbcommit > 1) {
         my $MAXABS=12;  # TODO limit to 10
         my $col=$color_commit; $col=~s/#//;
         # Build graph for developer ratio
-        my $pngfilenbcommit="${PROG}_${Module}_developerscommit.png";
+        my $pngfilenbcommit="${OutputRootFile}_developerscommit.png";
         my @data = ([keys %nbcommit],[values %nbcommit]);
         my $graph = GD::Graph::pie->new(160, 138);
         $graph->set( 
@@ -1578,7 +1582,7 @@ if (scalar keys %nbcommit > 1) {
         close IMG;
         # End build graph
         # Build graph
-        my $pngfilefile="${PROG}_${Module}_developersfile.png";
+        my $pngfilefile="${OutputRootFile}_developersfile.png";
         my @data = ([keys %nbfile],[values %nbfile]);
         my $graph = GD::Graph::pie->new(160, 138);
         $col=$color_file; $col=~s/#//;
@@ -1609,7 +1613,7 @@ if (scalar keys %nbcommit > 0) {
         my $TICKSNB=10;
         my $col=$color_commit; $col=~s/#//;
         # Build graph for activity by developer
-        my $pngfile="${PROG}_${Module}_commitshistorybyuser.png";
+        my $pngfile="${OutputRootFile}_commitshistorybyuser.png";
 
         my $maxordo=0;
         my @data = ();
@@ -1683,7 +1687,7 @@ else {
         $ordo[$dayofweek-1]+=$DateUser{"$dateuser"};
     }
     # Build graph
-    my $pngfile="${PROG}_${Module}_daysofweek.png";
+    my $pngfile="${OutputRootFile}_daysofweek.png";
     my @data = ([@absi],[@ordo]);
     my $graph = GD::Graph::bars->new(260, 200);
     $graph->set( 
@@ -1731,7 +1735,7 @@ else {
         $ordo[int($hour)]+=$HourUser{"$houruser"};
     }
     # Build graph
-    my $pngfile="${PROG}_${Module}_hours.png";
+    my $pngfile="${OutputRootFile}_hours.png";
     my @data = ([@absi],[@ordo]);
     my $graph = GD::Graph::bars->new(640, 240);
     $graph->set( 
