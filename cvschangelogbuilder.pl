@@ -52,6 +52,7 @@ my $EXTRACTSYMBOLICNAMEENTRY="^\\s(.+): ([\\d\\.]+)";
 my $EXTRACTFILEVERSION="^revision (.+)";
 my $EXTRACTFILEDATEAUTHORSTATE="date: (.+)\\sauthor: (.*)\\sstate: ([^\\s]+)(.*)";
 my $CVSCLIENT="cvs";
+my $COMP=" -z 6 ";
 my $ViewCvsUrl="";
 # ---------- Init Regex --------
 use vars qw/ $regclean1 $regclean2 /;
@@ -188,6 +189,10 @@ sub LoadDataInMemory {
 			}
 		}
 	}
+	# We know state
+	# If added or removed, value for lines added and deleted is not correct, so we download file to count it
+	# TODO
+	
 	
 	# All infos were found. We can process record
 	debug(">>>> File revision: $fileformat - $newfilename - $fileversion - $filedate - $fileauthor - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
@@ -256,7 +261,7 @@ sub LoadDataInMemory {
 	if ($Output =~ /^buildhtmlreport/) {
 	    if (! $AuthorChangeLast{$fileauthor} || $AuthorChangeLast{$fileauthor} < $filedate) { $AuthorChangeLast{$fileauthor}=$filedate; }
 	    $AuthorChangeCommit{$fileauthor}{$filename}++;
-	    if ($fileformat) {
+	    if ($fileformat ne 'b') {
 	        $AuthorChangeLineAdd{$fileauthor}+=$filelineadd;
 	        $AuthorChangeLineDel{$fileauthor}+=$filelinedel;
 	        $AuthorChangeLineChange{$fileauthor}+=$filelinechange;
@@ -579,10 +584,10 @@ if (! $RLogFile) {
 	my $command;
 	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
 	if ($Branch) {
-		$command="$CVSCLIENT -d ".$ENV{"CVSROOT"}." rlog -r${Branch} $Module";
+		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -r${Branch} $Module";
 	}
 	else {
-		$command="$CVSCLIENT -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
+		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
 	writeoutput("Building temporary cvs rlog file '$TmpFile'\n",1);
 	writeoutput("with command '$command'\n",1);
@@ -851,8 +856,7 @@ if ($Output =~ /byfile$/) {
 		foreach my $file (sort keys %FilesLastVersion) {
 			my $firstlineprinted=0;
 			my $val='';
-			foreach my $version (sort { &CompareVersion($a,$b) } keys %{$FilesChangeDate{$file}}) {
-			#foreach my $revision (sort { ${$FilesChangeOrder{$file}{$b}} <=> ${$FilesChangeOrder{$file}{$a}} } keys ( %{$FilesChangeOrder{$file}} ) {
+			foreach my $version (reverse sort { &CompareVersion($a,$b) } keys %{$FilesChangeDate{$file}}) {
 				if ($maxincludedver{"$file"} && (CompareVersionBis($version,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $version > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
 				if ($minexcludedver{"$file"} && (CompareVersionBis($version,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $version <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
 				if (! $firstlineprinted) {
@@ -950,7 +954,7 @@ print <<EOF;
 
 <a name="linesofcode">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Lines of code</td><td class="aws_blank">(non binary files only)</td></tr>
+<tr><td class="aws_title" width="70%">Lines of code*</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data month" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 
@@ -1042,10 +1046,10 @@ print <<EOF;
 
 <a name="developpers">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
-<tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(on non binary files only)</td></tr>
+<tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="#AA88BB" width="140">Number of files commited</th><th bgcolor="#8877DD" width="140">Number of commits</th><th bgcolor="#C1B2E2" width="140">Lines<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last change</th><th>&nbsp; </th></tr>
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="#AA88BB" width="140">Number of files commited</th><th bgcolor="#8877DD" width="140">Number of commits</th><th bgcolor="#C1B2E2" width="140">Lines<br>(added, modified, removed)*</th><th bgcolor="#CEC2E8" width="140">Lines by commit<br>(added, modified, removed)*</th><th bgcolor="#88A495" width="140">Last change</th><th>&nbsp; </th></tr>
 EOF
 my %nbcommit=(); my %nbfile=();
 foreach my $key (sort keys %AuthorChangeCommit) {
