@@ -5,10 +5,6 @@ $Revision$ - $Author$ - $Date$
 2.0
 
 - Added an option to build an HTML report of CVS activity: By authors, list commit logs, ...
-
-
-1.1
-
 - Updated logo.
 - Autodetect value for module name and repository if in a repository dir.
 

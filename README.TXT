@@ -16,12 +16,12 @@ listdeltaforrpm		To build a changelog to include in a rpm .spec file.
 listdeltabydate		To build a changelog by date (looks near 'cvs log').
 listdeltabyfile		To build a changelog by file.
 listdeltabylog		To build a changelog by change comment.
-
+buildhtmlreport     To build an html report of project CVS activity.
 
 License: GNU GPL (GNU General Public License. See LICENSE file)
-Version : 1.0
-Release date: December 2003
-Platforms: All (Linux, NT, SCO, BSD, Solaris and other *NIX's, BeOS, OS/2...)
+Version : 2.0
+Release date: June 2004
+Platforms: All (Linux, NT, BSD, Solaris and other *NIX's, BeOS, OS/2...)
 Author: Laurent Destailleur <eldy@users.sourceforge.net>
 cvschangelogbuilder official web site and latest version: http://cvschangelogbuilder.sourceforge.net
 
@@ -31,11 +31,12 @@ I - Files
 	The distribution of cvschangelogbuilder package includes the following files:
 	README.TXT                      This file
 	cvschangelogbuilder.pl          The cvschangelogbuilder tool.
-
+    images/*                        Just some icones of project
+    
 
 II - ABOUT THE AUTHOR, LICENSE AND SUPPORT
 -------------------------------------------
-Copyright (C) 2000-2001 - Laurent Destailleur - eldy@users.sourceforge.net
+Copyright (C) 2003-2004 - Laurent Destailleur - eldy@users.sourceforge.net
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
