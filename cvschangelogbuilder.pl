@@ -315,7 +315,7 @@ sub LoadDataInMemory {
             }
             if ($errorstring) { 
                 warning("Failed to execute command: $command: $errorstring");
-                print CACHE "$relativefilename $filerevisiontoscan ERROR $errorstring\n";
+                print CACHE "$relativefilename $filerevisiontoscan ERROR $command: $errorstring\n";
             }
             else {
                 debug("Nb of line : $nbline",2);
