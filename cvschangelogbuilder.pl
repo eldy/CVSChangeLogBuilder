@@ -1027,6 +1027,7 @@ if ($Output =~ /buildhtmlreport$/) {
     my $color_file="#AA88BB";
     my $color_lightgrey="#F0F0F0";
     my $color_grey="#888888";
+    my $color_last="#88A495";
     
     # Made some calculation on commits by author
     my %nbcommit=(); my %nbfile=();
@@ -1108,11 +1109,35 @@ print <<EOF;
 <tr><td colspan="2">
 <table class="aws_data summary" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"aws\" colspan=\"2\"><b>$Module</b></td></tr>";
-print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"2\"><b>$rangestring</b></td></tr>";
-print "<tr><td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"2\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
-print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Number of developers</td><td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td><td width=\"500\">&nbsp;</td></tr>";
-print "<tr><td bgcolor=\"$color_commit\" class=\"aws\">Number of commits</td><td><b>$nbtotalcommit</b></td><td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file, <b>$TotalCommitByState{'changed'}</b> to change existing file, <b>$TotalCommitByState{'removed'}</b> to remove file</td></tr>";
+print "<tr><td class=\"aws\" width=\"200\">Project module name</td><td class=\"aws\" colspan=\"3\"><b>$Module</b></td></tr>";
+
+print "<tr><td class=\"aws\">Range analysis</td><td class=\"aws\" colspan=\"3\"><b>$rangestring</b></td></tr>";
+print "<td class=\"aws\">Date analysis</td><td class=\"aws\" colspan=\"3\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>";
+
+print "<tr><td class=\"aws_title\">Indicator</td><td class=\"aws_title\" width=\"180\">All over time</td><td class=\"aws_title\" width=\"180\">This month</td><td class=\"aws_title\" width=\"180\">Today</td></tr>";
+
+print "<tr><td bgcolor=\"FFF0E0\" class=\"aws\">Number of developers</td>";
+print "<td width=\"100\"><b>".(scalar keys %AuthorChangeCommit)."</b></td>";
+print "<td width=\"100\">&nbsp;</td>";
+print "<td width=\"100\">&nbsp;</td>";
+print "</tr>";
+
+print "<tr><td bgcolor=\"$color_commit\" class=\"aws\">Number of commits</td>";
+print "<td><b>$nbtotalcommit</b></td>";
+print "<td><b>&nbsp;</b></td>";
+print "<td><b>&nbsp;</b></td>";
+print "</tr>";
+
+print "<tr><td>&nbsp;</td>";
+print "<td class=\"aws\"><b>$TotalCommitByState{'added'}</b> to add new file,<br><b>$TotalCommitByState{'changed'}</b> to change existing file,<br><b>$TotalCommitByState{'removed'}</b> to remove file</td>";
+print "<td class=\"aws\">&nbsp;</td>";
+print "<td class=\"aws\">&nbsp;</td>";
+print "</tr>";
+
+print "<tr><td class=\"aws_title\" colspan=\"4\">&nbsp;</td></tr>";
+
+print "<tr><td bgcolor=\"$color_last\" class=\"aws\">Last commit</td><td class=\"aws\" colspan=\"3\"><b>2004-mm-dd</b> by <b>user</b></td></tr>";
+
 print <<EOF;
 </table></td></tr></table><br />
 
@@ -1176,7 +1201,7 @@ print <<EOF;
 <tr><td class="aws_title" width="70%">Developers activity</td><td class="aws_blank">(* on non binary files only)</td></tr>
 <tr><td colspan="2">
 <table class="aws_data authors" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
-<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="#88A495" width="140">Last commit</th><th>&nbsp; </th></tr>
+<tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="#C1B2E2" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="#CEC2E8" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="$color_last" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
 
 # BY DEVELOPERS
