@@ -70,6 +70,9 @@ $regclean2=qr/<\/?[^<>]+>/i;
 # For all
 my %maxincludedver=();
 my %minexcludedver=();
+my %tagsfulldate=();
+my %tagsshortdate=();
+my %tagstags=();
 my %Cache=();
 # For output by date
 my %DateUser=();
@@ -356,6 +359,18 @@ sub LoadDataInMemory {
         }
 	}
 	
+	# Update last date of tags
+	foreach my $tag (%{$filesym{$newfilename}}) {
+		if ($filesym{$newfilename}{$tag} == $filerevision) {
+			if (! $tagsfulldate{$tag} || $filedate > $tagsfulldate{$tag}) {
+				$tagsfulldate{$tag}=$filedate;
+				$filedate =~ /^(\d\d\d\d\d\d\d\d)/;
+				$tagsshortdate{$tag}="$1";
+				debug("Update date of tag '$tag' with '$filedate' and '$1'",5);
+			}
+		}
+	}		
+
 	# All infos were found. We can process record
 	debug(">>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
 	
@@ -967,7 +982,7 @@ while (<RLOGFILE>) {
 	if ($waitfor eq "symbolic_name_entry") {
 		if ($line =~ /$EXTRACTSYMBOLICNAMEENTRY/i) {
 			# We found symbolic name entry
-			# We set symbolic name. Example: $filesym{$fullfilename}{MYAPPLI_1_0}=1.2
+			# We set symbolic name. Example: $filesym{$fullfilename}{MYAPPLI_1_0}=2.31
 			$filesym{$fullfilename}{$1}=$2;
 			debug("Found symbolic name entry $1 is for version $filesym{$fullfilename}{$1}",2);
 			if ($TagEnd && $TagEnd eq $1) {
@@ -1056,6 +1071,12 @@ if ($Output =~ /^buildhtmlreport/) {
     close CACHE;
 }
 
+# Build %tagsshortdate
+#---------------------
+foreach my $tag (keys %tagsshortdate) {
+	$tagstags{$tagsshortdate{$tag}}{$tag}=1;
+	debug("Add entry in tagstags for key $tagsshortdate{$tag} with value $tag",2);
+}
 
 # BUILD OUTPUT
 #------------------------
@@ -1249,7 +1270,9 @@ if ($Output =~ /bylog$/) {
 }
 
 
-# For building html report
+
+# Building html report
+#---------------------
 if ($Output =~ /buildhtmlreport$/) {
     writeoutput("Generating HTML report...\n",1);
 
@@ -1802,11 +1825,25 @@ EOF
 #---------
 
 my $width=140;
-writeoutputfile "<tr bgcolor=\"#FFF0E0\"><th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th>Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
+writeoutputfile "<tr bgcolor=\"#FFF0E0\">";
+writeoutputfile "<th width=80>Tags</th>";
+writeoutputfile "<th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th>Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 my $cursor=0;
 foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
-    writeoutputfile "<tr><td valign=\"top\">".FormatDate($date)."</td>";
+
+    writeoutputfile "<tr>";
+	my $shortdate=$date;
+    writeoutputfile "<td valign=\"top\">";
+	if (keys %{$tagstags{$shortdate}}) {
+		foreach my $tag (reverse sort keys %{$tagstags{$shortdate}}) {
+	    	writeoutputfile "$tag<br>";
+		}
+	} else {
+	    	writeoutputfile "&nbsp;";
+	}
+    writeoutputfile "</td>";
+    writeoutputfile "<td valign=\"top\">".FormatDate($date)."</td>";
     writeoutputfile "<td valign=\"top\">".$user."</td>";
     writeoutputfile "<td class=\"aws\">";
 	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
