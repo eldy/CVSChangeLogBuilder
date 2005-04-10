@@ -2,6 +2,16 @@ CVSChangelogBuilder Changelog
 -----------------------------
 $Revision$ - $Author$ - $Date$
 
+2.1
+
+- New: Added option -ignore and -only
+- New: Chart for commit and files by developpers are limited to 5 most
+  active users and group others as "Others".
+- New: Added a date tag reports
+- Added tags informations in last commit list
+- Fix: Minor fixes.
+
+
 2.0
 
 - New: Added an option to build an HTML report of CVS activity: By authors, list commit logs, ...
