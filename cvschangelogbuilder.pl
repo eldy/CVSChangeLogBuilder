@@ -124,7 +124,7 @@ sub mkdir_recursive() {
         }
     
         if ($parent && $dir && -d $parent) {
-            debug("Create dir '$parent/$dir'",2);
+            debug(" Create dir '$parent/$dir'",2);
             if (mkdir "$parent/$dir") {
                 push @{$array}, "$parent/$dir";
                 #print STDERR "$parent/$dir\n";
@@ -138,7 +138,7 @@ sub mkdir_recursive() {
         }
     }
     else {
-        debug("Create dir '$mdir'",2);
+        debug(" Create dir '$mdir'",2);
         if (mkdir "$mdir") {
             push @{$array}, "$mdir";
             #print STDERR "$parent/$dir\n";
@@ -275,13 +275,14 @@ sub LoadDataInMemory {
 	    my $relativefilename=ExcludeRepositoryFromPath("$fullfilename",0,1);
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$fullfilename",1,1);
         if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR/) {
+
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
             # Create dir if not exists
             my @added_dir_to_remove=();
             my @added_files_to_remove=();
-   	        debug("Need to get file '$filenametoget' $filerevisiontoscan\n",2);
+   	        debug(" Number of lines not available, need to get file '$filenametoget' $filerevisiontoscan\n",2);
             if ($filenametoget =~ /Attic\//) {
                 my $dir=$filenametoget;
                 #$dir =~ s/^[^\@]+\@//;
@@ -290,13 +291,13 @@ sub LoadDataInMemory {
                     # Create dir to allow cvs update
                     &mkdir_recursive("$dir/CVS",\@added_dir_to_remove);
                     if (! -f "$dir/CVS/Entries") {
-                        debug("Create file '$dir/CVS/Entries'",2);
+                        debug(" Create file '$dir/CVS/Entries'",2);
                         push @added_files_to_remove, "$dir/CVS/Entries";
                         open(ENTRIESFILE,">$dir/CVS/Entries");
                         close(ENTRIESFILE);
                     }
                     if (! -f "$dir/CVS/Repository") {
-                        debug("Create file '$dir/CVS/Repository'",2);
+                        debug(" Create file '$dir/CVS/Repository'",2);
                         push @added_files_to_remove, "$dir/CVS/Repository";
                 	    my $relativepath=$relativefilename; $relativepath =~ s/[\\\/][^\/\\]+$//;
                         open(REPOSITORY,">$dir/CVS/Repository");
@@ -306,11 +307,13 @@ sub LoadDataInMemory {
                 }
                 $filenametoget =~ s/Attic\///;
             }
-            # TODO update with both -p and -d does not work.
-            # Must change to firs run update -d, then update -p -r xxx
+            # TODO update with both -p and -d does not work (don't know why).
+            # Must change to first run update -d, then update -p -r xxx
+	        #my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -d";
+	        #my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -r $filerevisiontoscan $filenametoget";
 	        my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." update -p -d -r $filerevisiontoscan $filenametoget";
-	        debug("Getting file '$relativefilename' revision '$filerevisiontoscan'\n",3);
-	        debug("with command '$command'\n",3);
+	        debug(" Getting file '$relativefilename' revision '$filerevisiontoscan'\n",3);
+	        debug(" with command '$command'\n",3);
             my $errorstring='';
             my $pid = open(PH, "$command 2>&1 |");
             while (<PH>) {
@@ -320,29 +323,37 @@ sub LoadDataInMemory {
                 if ($_ =~ /cvs \[update aborted\]:/) { $errorstring=$_; $nbline=0; last; }
                 $nbline++;
             }   
-            # Remove downloaded files and dir
-            foreach my $filetodelete (@added_files_to_remove) {
-                debug("Remove file '$filetodelete'",2);
-                unlink $filetodelete;
-            }
-            foreach my $dirtodelete (reverse @added_dir_to_remove) {
-                debug("Remove dir '$dirtodelete'",2);
-                rmdir $dirtodelete;
-            }
+
+            # Show or exploit result
             if ($errorstring) { 
-                warning("Failed to execute command: $command: $errorstring");
-                if ($Cache{$relativefilename}{$filerevisiontoscan} !~ /^ERROR/) {
+                warning(" Failed to execute command: $command: $errorstring");
+                if ($Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR(\d*)$/) {
                     # If it was not in error before, we track the error in cache file
-                    print CACHE "$relativefilename $filerevisiontoscan ERROR $command: $errorstring\n";
+                    #print CACHE "$relativefilename $filerevisiontoscan ERROR".(int($1)+1)." $command: $errorstring\n";
+                }
+                else {
+                    # If it was not in error before, we track the error in cache file
+                    print CACHE "$relativefilename $filerevisiontoscan ERROR1 $command: $errorstring\n";
                 }
             }
             else {
-                debug("Nb of line : $nbline",2);
+                debug(" Nb of line : $nbline",2);
                 $Cache{$relativefilename}{$filerevisiontoscan}=$nbline; 
                 # Save result in a cache for other run
                 print CACHE "$relativefilename $filerevisiontoscan $nbline $fileformat\n";
             }
             close(PH);
+
+            # Remove downloaded files and dir
+            foreach my $filetodelete (@added_files_to_remove) {
+                debug(" Remove file '$filetodelete'",2);
+                unlink $filetodelete;
+            }
+            foreach my $dirtodelete (reverse @added_dir_to_remove) {
+                debug(" Remove dir '$dirtodelete'",2);
+                rmdir $dirtodelete;
+            }
+
         }
         else {
             $nbline=$Cache{$relativefilename}{$filerevisiontoscan};
@@ -353,7 +364,7 @@ sub LoadDataInMemory {
             $filelineadd=$nbline;
         }
         if ($newfilestate eq 'removed') {
-            debug("Nb of line : $nbline $relativefilename $filerevisiontoscan",2);
+            debug(" Nb of line : $nbline $relativefilename $filerevisiontoscan",2);
             $filechange="+0 -$nbline";
             $filelinedel=$nbline;
         }
@@ -361,18 +372,18 @@ sub LoadDataInMemory {
 	
 	# Update last date of tags
 	foreach my $tag (%{$filesym{$newfilename}}) {
-		if ($filesym{$newfilename}{$tag} == $filerevision) {
+		if ("$filesym{$newfilename}{$tag}" eq "$filerevision") {  # Prendre comparaison texte pour avoir 1.1 != 1.10
 			if (! $tagsfulldate{$tag} || $filedate > $tagsfulldate{$tag}) {
 				$tagsfulldate{$tag}=$filedate;
 				$filedate =~ /^(\d\d\d\d\d\d\d\d)/;
 				$tagsshortdate{$tag}="$1";
-				debug("Update date of tag '$tag' with '$filedate' and '$1'",5);
+				debug(" Update date of tag '$tag' with full date '$filedate' and short date '$1' (from $newfilename $filerevision)",5);
 			}
 		}
 	}		
 
 	# All infos were found. We can process record
-	debug(">>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
+	debug(" >>>> File revision: $fileformat - $newfilename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $newfilestate",2);
 	
 	# For output by date
 	if ($Output =~ /bydate/ || $Output =~ /forrpm/ || $Output =~ /buildhtmlreport/) {
@@ -391,7 +402,7 @@ sub LoadDataInMemory {
 				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
 			if ($DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^changed$/) {
-				debug("Correct next version of $newfilename $filerevisionnext ($filerevisionnext should be 'added_forced' instead of 'changed')",3);
+				debug(" Correct next version of $newfilename $filerevisionnext ($filerevisionnext should be 'added_forced' instead of 'changed')",3);
 				$DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"}="added_forced";
 			}
 		}
@@ -404,7 +415,7 @@ sub LoadDataInMemory {
 				$filerevisionnext =~ s/\.(\d+)$/\.$newver/;
 			}
 			if ($DateUserLogFileRevState{$oldfiledayuser}{$oldfilelog}{"$newfilename $filerevisionnext"} =~ /^(removed|changed_forced)$/) {
-				debug("Correct version of $newfilename $filerevision ($filerevision should be 'changed_forced' instead of 'removed')",3);
+				debug(" Correct version of $newfilename $filerevision ($filerevision should be 'changed_forced' instead of 'removed')",3);
 				$DateUserLogFileRevState{"$fileday $fileuser"}{$newfilelog}{"$newfilename $filerevision"}='changed_forced';	# with _forced to not be change again by previous test
 			}
 		}
@@ -665,11 +676,12 @@ if ($QueryString =~ /-ignore=([^\s]+)/i)        { $IgnoreFileDir{$1}=1; }
 if ($QueryString =~ /-only=([^\s]+)/i)        	{ $OnlyFileDir{$1}=1; }
 ($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
-debug("Parameter Module    : $Module");
-debug("Parameter Output    : $Output");
-debug("Parameter OutputDir : $OutputDir");
-debug("Parameter Branch    : $Branch");
-debug("Parameter ViewCvsUrl: $ViewCvsUrl");
+debug("Parameter Module       : $Module");
+debug("Parameter Output       : $Output");
+debug("Parameter OutputDir    : $OutputDir");
+debug("Parameter Branch       : $Branch");
+debug("Parameter ViewCvsUrl   : $ViewCvsUrl");
+debug("Parameter IgnoreFileDir: ".join(',',keys %IgnoreFileDir));
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
 # On determine chemin complet du repertoire racine et on en deduit les repertoires de travail
@@ -746,7 +758,7 @@ if ($Help || ! $Output) {
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
 	writeoutput("                           output are links to \"viewcvs\".\n");
 	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
-	writeoutput("  -debug=x            To get debug info with level x\n");
+	writeoutput("  -debug=x            To output on stderr debug info with level x\n");
 	writeoutput("\n");
 	writeoutput("Example:\n");
 	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
@@ -934,7 +946,7 @@ while (<RLOGFILE>) {
 	chomp $_; s/\r$//;
 	my $line="$_";
 
-	debug("Analyze line $line (waitfor=$waitfor)",3);
+	debug("Analyze line: $line (waitfor=$waitfor)",3);
 
 	# Check if there is a warning in rlog file
 	#if ($line =~ /^cvs rlog: warning: no revision/) { print("$line\n"); next; }
@@ -950,8 +962,16 @@ while (<RLOGFILE>) {
 			# We found a new filename
 			debug("Found a new file '$fullfilename'",2);
             my $qualified=1;
-            if ($IgnoreFileDir{$truefilename} || $IgnoreFileDir{$truefilename}) { $qualified=-1; }
-            if (scalar keys %OnlyFileDir && ! $OnlyFileDir{$truefilename} && ! $OnlyFileDir{$truefilename}) { $qualified=-2; }
+            # Check if file qualified
+            foreach my $key (keys %IgnoreFileDir) {
+                if ($truefilename =~ /$key/) { $qualified=-1; last; }
+            }
+            if (scalar keys %OnlyFileDir) {
+                $qualified=-2; 
+                foreach my $key (keys %OnlyFileDir) {
+                    if ($truefilename =~ /$key/) { $qualified=1; last; }
+                }
+            }
     		if ($qualified > 0) {
     			debug("File is qualified to be included in report",2);
     			$waitfor="symbolic_name";
@@ -1006,7 +1026,7 @@ while (<RLOGFILE>) {
 		if ($line =~ /^=====/) {
 			# No revision found
 			$waitfor="filename";
-			debug(" No revision found. Waiting for next $waitfor.",2);
+			debug(" No revision found. Now waiting for '$waitfor'.",2);
 			$fileformat=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
@@ -1014,7 +1034,7 @@ while (<RLOGFILE>) {
 			# We found a new revision number
 			$filerevision=$1;
 			$waitfor="dateuserstate";
-			debug("Found a new revision number $filerevision",2);
+			debug("Found a new revision number: $filerevision. Now waiting for '$waitfor'.",2);
 		}
 		next;
 	}
@@ -1036,7 +1056,7 @@ while (<RLOGFILE>) {
 			}
 			$filedate =~ s/[\s;]+$//; $fileuser =~ s/[\s;]+$//; $filestate =~ s/[\s;]+$//; $filechange =~ s/\s+//g;
 			$waitfor="log";
-			debug("Found a new date/user/state/lines $filedate $fileuser $filestate $filelineadd $filelinedel $filelinechange",2);
+			debug("Found a new date/user/state/nbadd/nbchange/nbdel $filedate $fileuser $filestate $filelineadd $filelinechange $filelinedel. Now waiting for '$waitfor'.",2);
 		}
 		next;
 	}
@@ -1047,21 +1067,23 @@ while (<RLOGFILE>) {
 		if ($line =~ /^-----/) {
 			$waitfor="revision";
 			# Load all data for this revision file in memory
+			debug("Info are complete, we store them",2);
 			LoadDataInMemory();
-			debug(" Revision info are stored. Waiting for next $waitfor.",2);
+			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
 			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /^=====/) {
 			$waitfor="filename";
 			# Load all data for this revision file in memory
+			debug("Info are complete, we store them",2);
 			LoadDataInMemory();
-			debug(" Revision info are stored. Waiting for next $waitfor.",2);
+			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
 			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		# Line is log
-		debug("Found a new line for log $line",2);
+		debug("Found a new line for log: $line",2);
 		$filelog.="$line\n";
 		next;
 	}
@@ -1074,6 +1096,8 @@ if ($Output =~ /^buildhtmlreport/) {
 # Build %tagsshortdate
 #---------------------
 foreach my $tag (keys %tagsshortdate) {
+    # $tagsshortdate{v1_0}=20041201
+    # $tagstags{20041201}{v1_0}=1
 	$tagstags{$tagsshortdate{$tag}}{$tag}=1;
 	debug("Add entry in tagstags for key $tagsshortdate{$tag} with value $tag",2);
 }
@@ -1433,7 +1457,12 @@ if ($Output =~ /buildhtmlreport$/) {
     
 writeoutputfile <<EOF;
 <a name="top">&nbsp;</a>
+EOF
 
+
+# PARAMETERS
+#-----------
+writeoutputfile <<EOF;
 <table width="100%"><tr><td>
 <a name="parameters">&nbsp;</a><br>
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0">
@@ -1449,7 +1478,12 @@ writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td clas
 
 writeoutputfile <<EOF;
 </table></td></tr></table>
+EOF
 
+
+# LINKS
+#------
+writeoutputfile <<EOF;
 </td><td>
 $headstring<br>
 <a href="#summary">Summary</a> &nbsp; 
@@ -1457,10 +1491,16 @@ $headstring<br>
 <a href="#developers">Developers&nbsp;activity</a> &nbsp; 
 <a href="#daysofweek">Days&nbsp;of&nbsp;week</a> &nbsp; 
 <a href="#hours">Hours</a> &nbsp;
+<a href="#tags">Tags</a> &nbsp;
 <a href="#lastlogs">Last&nbsp;commits</a> &nbsp;
 </td></tr></table>
 <br />
+EOF
 
+
+# SUMMARY
+#--------
+writeoutputfile <<EOF;
 <a name="summary">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Summary</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
@@ -1521,7 +1561,12 @@ writeoutputfile "<tr><td class=\"aws\">Last commit</td><td bgcolor=\"$color_last
 
 writeoutputfile <<EOF;
 </table></td></tr></table><br />
+EOF
 
+
+# LINES OF CODE
+#--------------
+writeoutputfile <<EOF;
 <a name="linesofcode">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Lines of code*</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
@@ -1533,9 +1578,6 @@ This chart represents the balance between number of lines added and removed in n
 <center>
 EOF
 
-# LINES OF CODE
-#--------------
-
 writeoutputfile "<table width=\"100%\">";
 #writeoutputfile "<tr><td align=\"left\" colspan=\"3\">This chart represents the balance between number of lines added and removed in non binary files (source files).</td></tr>\n";
 writeoutputfile "<tr><td>&nbsp;</td>";
@@ -1544,7 +1586,7 @@ if ($errorstringlines) {
     writeoutputfile "<td>Perl module GD::Graph::lines must be installed to get charts</td>";   
 }
 else {
-    my $MAXABS=12;  # TODO limit to 10
+    my $MAXABS=15;  # TODO limit to 10
     my $col="#706880"; $col=~s/#//;
     # Build graph
     my $pngfile="${OutputRootFile}_codelines.png";
@@ -1579,7 +1621,13 @@ writeoutputfile "</table>\n";
 writeoutputfile <<EOF;
 </center>
 </td></tr></table></td></tr></table><br />
+EOF
 
+
+# BY DEVELOPERS
+#--------------
+my $MAXABS=5;
+writeoutputfile <<EOF;
 <a name="developers">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Developers activity*</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
@@ -1587,9 +1635,6 @@ writeoutputfile <<EOF;
 <table class="aws_data users" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 <tr bgcolor="#FFF0E0"><th width="140">Developer</th><th bgcolor="$color_commit" width="140">Number of commits</th><th bgcolor="$color_file" width="140">Different files commited</th><th bgcolor="$color_lines" width="140">Lines*<br>(added, modified, removed)</th><th bgcolor="$color_lines2" width="140">Lines by commit*<br>(added, modified, removed)</th><th bgcolor="$color_last" width="140">Last commit</th><th>&nbsp; </th></tr>
 EOF
-
-# BY DEVELOPERS
-#--------------
 
 foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
     writeoutputfile "<tr><td class=\"aws\">";
@@ -1608,24 +1653,48 @@ foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nb
     writeoutputfile "<td>&nbsp;</td>";
     writeoutputfile "</tr>";
 }
-if (scalar keys %nbcommit > 1) {
+
+# Define another hash limited to $MAXABS
+my $i=0;
+my %newnbcommit=();
+my $libother="Others (".((scalar keys %nbcommit) - $MAXABS).")";
+foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nbcommit) {
+    $i++;
+    if ($i <= $MAXABS) {
+        $newnbcommit{$developer}=$nbcommit{$developer};
+    } else {
+        $newnbcommit{$libother}+=$nbcommit{$developer};
+    }
+}
+$i=0;
+my %newnbfile=();
+$libother="Others (".((scalar keys %nbfile) - $MAXABS).")";
+foreach my $developer (reverse sort { $nbfile{$a} <=> $nbfile{$b} } keys %nbfile) {
+    $i++;
+    if ($i <= $MAXABS) {
+        $newnbfile{$developer}=$nbfile{$developer};
+    } else {
+        $newnbfile{$libother}+=$nbfile{$developer};
+    }
+}
+
+if (scalar keys %newnbcommit > 1) {
     if ($errorstringpie) {
         writeoutputfile "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
     }
     else {
-        my $MAXABS=12;  # TODO limit to 10
+        # Build graph for developer commit ratio, hash used: newnbcommit{developer}=nb
         my $col=$color_commit; $col=~s/#//;
-        # Build graph for developer ratio
         my $pngfilenbcommit="${OutputRootFile}_developerscommit.png";
-        my @data = ([keys %nbcommit],[values %nbcommit]);
-        my $graph = GD::Graph::pie->new(160, 138);
+        my @data = ([keys %newnbcommit],[values %newnbcommit]);
+        my $graph = GD::Graph::pie->new(170, 138);
         $graph->set( 
-              title             => 'Number of commits',
+              title             => "Number of commits",
               axislabelclr      => qw(black),
               textclr           => $color_commit,
               transparent       => 1,
               accentclr         => $color_grey,
-              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (0..($MAXABS-1)) ]
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050501")*$_))) } (0..((scalar keys %newnbcommit)-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">${OutputDir}$pngfilenbcommit") or die $!;
@@ -1633,10 +1702,10 @@ if (scalar keys %nbcommit > 1) {
         print IMG $gd->png;
         close IMG;
         # End build graph
-        # Build graph
+        # Build graph for developer file ratio, hash used: newnbfile{developer}=nb
         my $pngfilefile="${OutputRootFile}_developersfile.png";
-        my @data = ([keys %nbfile],[values %nbfile]);
-        my $graph = GD::Graph::pie->new(160, 138);
+        my @data = ([keys %newnbfile],[values %newnbfile]);
+        my $graph = GD::Graph::pie->new(170, 138);
         $col=$color_file; $col=~s/#//;
         $graph->set( 
               title             => 'Different files',
@@ -1644,7 +1713,7 @@ if (scalar keys %nbcommit > 1) {
               textclr           => $color_file,
               transparent       => 1,
               accentclr         => $color_grey,
-              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
+              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..((scalar keys %newnbfile)-1)) ]
         ) or die $graph->error;
         my $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">${OutputDir}$pngfilefile") or die $!;
@@ -1655,13 +1724,13 @@ if (scalar keys %nbcommit > 1) {
         writeoutputfile "<tr><td colspan=\"7\"><br><img src=\"$pngfilenbcommit\" border=\"0\"> &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp;  &nbsp; <img src=\"$pngfilefile\" border=\"0\"></td></tr>\n";
     }
 }
-
+# Number of commits by developer in time
+$MAXABS=15; # TODO Mettre limit en utilisant newnbcommit au lieu de nbcommit mais necessite pour ca un newordonbcommituser
 if (scalar keys %nbcommit > 0) {
     if ($errorstringpie) {
         writeoutputfile "<tr><td colspan\"7\">Perl module GD::Graph::pie must be installed to get charts</td></tr>";
     }
     else {
-        my $MAXABS=12;  # TODO limit to 10
         my $TICKSNB=10;
         my $col=$color_commit; $col=~s/#//;
         # Build graph for activity by developer
@@ -1716,16 +1785,18 @@ if (scalar keys %nbcommit > 0) {
 writeoutputfile <<EOF;
 </table>
 </td></tr></table><br />
+EOF
 
+
+# BY DAYS OF WEEK
+#----------------
+writeoutputfile <<EOF;
 <a name="daysofweek">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Activity by days of week</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data daysofweek" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-
-# BY DAYS OF WEEK
-#----------------
 
 if ($errorstringbars) {
     writeoutputfile "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
@@ -1765,17 +1836,18 @@ else {
 
 writeoutputfile <<EOF;
 </table></td></tr></table><br />
+EOF
 
+
+# BY HOURS
+#---------
+writeoutputfile <<EOF;
 <a name="hours">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Activity by hours</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data hours" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-
-# BY HOURS
-#---------
-
 if ($errorstringbars) {
     writeoutputfile "<tr><td>Perl module GD::Graph::bars must be installed to get charts</td></tr>";
 }
@@ -1813,22 +1885,59 @@ else {
 
 writeoutputfile <<EOF;
 </table></td></tr></table><br />
+EOF
 
+
+my $widthdate=90;
+my $widthfulldate=160;
+my $widthdev=90;
+my $widthtag=100;
+
+# TAGS
+#-----
+writeoutputfile <<EOF;
+<a name="tags">&nbsp;</a><br />
+<table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
+<tr><td class="aws_title" width="70%">Last tags by date</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
+<tr><td colspan="2">
+<table class="aws_data tags" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
+EOF
+writeoutputfile "<tr bgcolor=\"#FFF0E0\">";
+writeoutputfile "<th width=\"$widthdate\">Date</th>";
+writeoutputfile "<th width=\"$widthfulldate\">Full date</th>";
+writeoutputfile "<th width=\"80\">Tags</th>";
+writeoutputfile "<th>&nbsp;</th>";
+writeoutputfile "</tr>\n";
+foreach my $tag (reverse sort { $tagsfulldate{$a} <=> $tagsfulldate{$b} } keys %tagsfulldate) {
+    writeoutputfile "<tr>";
+    writeoutputfile "<td valign=\"top\">".FormatDate($tagsshortdate{$tag})."</td>";
+    writeoutputfile "<td valign=\"top\">";
+  	writeoutputfile FormatDate($tagsfulldate{$tag},'simple');
+    writeoutputfile "</td>";
+    writeoutputfile "<td valign=\"top\">";
+  	writeoutputfile "$tag";
+    writeoutputfile "</td>";
+    writeoutputfile "<td>&nbsp;</td>";
+    writeoutputfile "</tr>\n";
+}
+writeoutputfile <<EOF;
+</table></td></tr></table><br />
+EOF
+
+
+# LASTLOGS
+#---------
+my $cursor=0;
+writeoutputfile <<EOF;
 <a name="lastlogs">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
 <tr><td class="aws_title" width="70%">Last commit logs</td><td class="aws_blank"><a href="#top">Top</a>&nbsp;</td></tr>
 <tr><td colspan="2">
 <table class="aws_data lastlogs" border="2" bordercolor="#ECECEC" cellpadding="2" cellspacing="0" width="100%">
 EOF
-
-# LASTLOGS
-#---------
-
-my $width=140;
 writeoutputfile "<tr bgcolor=\"#FFF0E0\">";
-writeoutputfile "<th width=80>Tags</th>";
-writeoutputfile "<th width=\"$width\">Date</th><th width=\"$width\">Developer</th><th>Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
-my $cursor=0;
+writeoutputfile "<th width=\"80\">Tags</th>";
+writeoutputfile "<th width=\"$widthdate\">Date</th><th width=\"$widthdev\">Developer</th><th>Last ".($MAXLASTLOG?"$MAXLASTLOG ":"")."Commit Logs</th></tr>";
 foreach my $dateuser (reverse sort keys %DateUser) {
     my ($date,$user)=split(/\s+/,$dateuser);
 
