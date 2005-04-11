@@ -538,6 +538,7 @@ sub FormatCvsDiffLink {
         my $label='diff';
         $string="$ViewCvsUrl";
         $string =~ s/__MODULE__/$Module/g;
+        $url =~ s/$Module\@//g;
         $string.="$url";
         if (CompareVersionBis($version,"1.1")>0) {
             my $versionprec=DecreaseVersion($version);
