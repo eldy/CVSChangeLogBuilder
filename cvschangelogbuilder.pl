@@ -527,7 +527,8 @@ sub FormatCvsFileLink {
 }
 
 #------------------------------------------------------------------------------
-# Function:      Format a viewcvs diff link
+# Function:     Format a viewcvs diff link
+#               ViewCvsUrl = http://cvs.sourceforge.net/viewcvs.py/__MODULE__/
 #------------------------------------------------------------------------------
 sub FormatCvsDiffLink {
 	my $url=shift;
@@ -535,7 +536,8 @@ sub FormatCvsDiffLink {
     if ($ViewCvsUrl) { 
         my $string='';
         my $label='diff';
-        $string="$ViewCvsUrl$Module/";
+        $string="$ViewCvsUrl";
+        $string =~ s/__MODULE__/$Module/g;
         $string.="$url";
         if (CompareVersionBis($version,"1.1")>0) {
             my $versionprec=DecreaseVersion($version);
