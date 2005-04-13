@@ -773,7 +773,7 @@ if ($Help || ! $Output) {
 }
 
 # Get current time
-my $nowtime=time;
+my $nowtime=time();
 my ($nowsec,$nowmin,$nowhour,$nowday,$nowmonth,$nowyear) = localtime($nowtime);
 if ($nowyear < 100) { $nowyear+=2000; } else { $nowyear+=1900; }
 my $nowsmallyear=$nowyear;$nowsmallyear =~ s/^..//;
@@ -1477,7 +1477,9 @@ EOF
 writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>Project&nbsp;module&nbsp;name</td><td class=\"aws\" width=\"400\"><b>$Module</b></td></tr>\n";
 writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS&nbsp;root&nbsp;used</td><td class=\"aws\" width=\"400\"><b>$CvsRoot</b></td></tr>\n";
 writeoutputfile "<tr><td class=\"aws\" colspan=2>Range&nbsp;analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
-writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b></td></tr>\n";
+writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b>";
+my $endtime=time();
+print " (Built in ".($endtime-$nowtime)."s)</td></tr>\n";
 
 writeoutputfile <<EOF;
 </table></td></tr></table>
