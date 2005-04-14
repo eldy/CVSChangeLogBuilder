@@ -206,6 +206,7 @@ sub writeoutputfile {
 #-------------------------------------------------------
 # LoadDataInMemory
 # Load cache entries in Hash
+# $fileformat - $filename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $filestate
 #-------------------------------------------------------
 sub LoadDataInMemory {
 
@@ -371,7 +372,7 @@ sub LoadDataInMemory {
 	}
 	
 	# Update last date of tags
-	foreach my $tag (%{$filesym{$newfilename}}) {
+	foreach my $tag (keys %{$filesym{$newfilename}}) {
 		if ("$filesym{$newfilename}{$tag}" eq "$filerevision") {  # Prendre comparaison texte pour avoir 1.1 != 1.10
 			if (! $tagsfulldate{$tag} || $filedate > $tagsfulldate{$tag}) {
 				$tagsfulldate{$tag}=$filedate;
@@ -1030,7 +1031,7 @@ while (<RLOGFILE>) {
 			# No revision found
 			$waitfor="filename";
 			debug(" No revision found. Now waiting for '$waitfor'.",2);
-			$fileformat=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$filename=''; $fullfilename=''; $fileformat=''; $filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
 		if ($line =~ /$EXTRACTFILEVERSION/i) {
@@ -1066,25 +1067,25 @@ while (<RLOGFILE>) {
 
 	# Wait for log comment
 	if ($waitfor eq "log") {
-		if ($line =~ /^branches:/) { next; }
-		if ($line =~ /^-----/) {
-			$waitfor="revision";
-			# Load all data for this revision file in memory
-			debug("Info are complete, we store them",2);
-			LoadDataInMemory();
-			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
-			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
-			next;	
-		}
 		if ($line =~ /^=====/) {
 			$waitfor="filename";
 			# Load all data for this revision file in memory
 			debug("Info are complete, we store them",2);
 			LoadDataInMemory();
 			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
-			$filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			$filename=''; $fullfilename=''; $fileformat=''; $filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
 			next;	
 		}
+		if ($line =~ /^-----/) {
+			$waitfor="revision";
+			# Load all data for this revision file in memory
+			debug("Info are complete, we store them",2);
+			LoadDataInMemory();
+			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
+			$filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+			next;	
+		}
+		if ($line =~ /^branches:/) { next; }
 		# Line is log
 		debug("Found a new line for log: $line",2);
 		$filelog.="$line\n";
