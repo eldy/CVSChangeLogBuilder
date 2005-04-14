@@ -1480,7 +1480,7 @@ writeoutputfile "<tr><td class=\"aws\" width=\"200\" colspan=2>CVS&nbsp;root&nbs
 writeoutputfile "<tr><td class=\"aws\" colspan=2>Range&nbsp;analysis</td><td class=\"aws\"><b>$rangestring</b></td></tr>\n";
 writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td class=\"aws\"><b>".FormatDate("$nowyear-$nowmonth-$nowday $nowhour:$nowmin")."</b>";
 my $endtime=time();
-print " (Built in ".($endtime-$nowtime)."s)</td></tr>\n";
+writeoutputfile " (Built in ".($endtime-$nowtime)."s)</td></tr>\n";
 
 writeoutputfile <<EOF;
 </table></td></tr></table>
