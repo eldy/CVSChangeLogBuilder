@@ -517,7 +517,9 @@ sub FormatCvsFileLink {
 	my $version=shift;
     if ($ViewCvsUrl) { 
         my $string='';
-        $string="$ViewCvsUrl$Module/";
+        $string="$ViewCvsUrl";
+        $string =~ s/__MODULE__/$Module/g;
+        $url =~ s/$Module\@//g;
         $string.="$url";
         $string.="?rev=".$version;
     	return "<a href=\"$string\">$url</a>";
@@ -760,7 +762,8 @@ if ($Help || ! $Output) {
 	writeoutput("                       downloaded log file.\n");
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
-	writeoutput("                           output are links to \"viewcvs\".\n");
+	writeoutput("                           output are links to \"viewcvs\". String '__MODULE__'\n");
+	writeoutput("                           will be replaced by name of CVS module.\n");
 	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
 	writeoutput("  -debug=x            To output on stderr debug info with level x\n");
 	writeoutput("\n");
@@ -768,7 +771,7 @@ if ($Help || ! $Output) {
 	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
 	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n");
 	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabylog  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n");
-	writeoutput("  $PROG.$Extension -module=mymodule  -output=buildhtmlreport -d=:ext:user\@cvs.sourceforge.net:/cvsroot\n");
+	writeoutput("  $PROG.$Extension -module=mymodule  -output=buildhtmlreport -d=:ext:user\@cvs.sourceforge.net:/cvsroot -viewcvsurl=\"http://savannah.nongnu.org/cgi-bin/viewcvs/project/__MODULE__\"\n");
 	writeoutput("\n");
 	exit 0;
 }
