@@ -678,7 +678,7 @@ if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
 if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
-if ($QueryString =~ /-ignore=([^\s]+)/i)        { $IgnoreFileDir{$1}=1; }
+if ($QueryString =~ /-ignore=([^\s]+)/i)        { map { $IgnoreFileDir{quotemeta($_)}=1; } split(',',$1); }
 if ($QueryString =~ /-only=([^\s]+)/i)        	{ $OnlyFileDir{$1}=1; }
 ($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
@@ -955,8 +955,55 @@ while (<RLOGFILE>) {
 
 	debug("Analyze line: $line (waitfor=$waitfor)",3);
 
+	if ($line =~ /^branches:/) { next; }
+
 	# Check if there is a warning in rlog file
 	#if ($line =~ /^cvs rlog: warning: no revision/) { print("$line\n"); next; }
+
+    # End of revision
+	if ($line =~ /^-----/) {
+    	if ($waitfor eq "log" && $filename && $filename !~ /__discarded/) {
+			# Load all data for this revision file in memory
+			debug("Info are complete, we store them",2);
+			LoadDataInMemory();
+    		debug(" Revision info are stored.",2);
+		}
+		else {
+            if ($filename =~ /__discarded/) {
+ 			    debug("File was discarded, we don't store info ($filename,$fullfilename,$fileformat,$filerevision,$filedate,$fileuser,$filestate,$filechange,$filelog,$filelineadd,$filelinedel,$filelinechange)",2);
+		    }
+		    else {
+ 			    debug("Info are not complete, we don't store them ($filename,$fullfilename,$fileformat,$filerevision,$filedate,$fileuser,$filestate,$filechange,$filelog,$filelineadd,$filelinedel,$filelinechange)",2);
+		    }
+		}
+		$waitfor="revision";
+		debug(" Now waiting for '$waitfor'.",2);
+		$filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+		next;	
+    }
+
+    # End of file
+	if ($line =~ /^=====/) {
+    	if ($waitfor eq "log" && $filename && $filename !~ /__discarded/) {
+			# Load all data for this revision file in memory
+			debug("Info are complete, we store them",2);
+			LoadDataInMemory();
+    		debug(" Revision info are stored.",2);
+		}
+		else {
+            if ($filename =~ /__discarded/) {
+ 			    debug("File was discarded, we don't store info ($filename,$fullfilename,$fileformat,$filerevision,$filedate,$fileuser,$filestate,$filechange,$filelog,$filelineadd,$filelinedel,$filelinechange)",2);
+		    }
+		    else {
+ 			    debug("Info are not complete, we don't store them ($filename,$fullfilename,$fileformat,$filerevision,$filedate,$fileuser,$filestate,$filechange,$filelog,$filelineadd,$filelinedel,$filelinechange)",2);
+		    }
+		}
+		$waitfor="filename";
+		debug(" Now waiting for '$waitfor'.",2);
+		$filename=''; $fullfilename=''; $fileformat=''; $filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
+		next;
+	}
+
 
 	# Wait for a new file
 	if ($waitfor eq "filename") {
@@ -967,10 +1014,11 @@ while (<RLOGFILE>) {
 			$fullfilename="$ModuleForCache\@$filename";
 			my $truefilename=ExcludeRepositoryFromPath("$filename",0,1);
 			# We found a new filename
-			debug("Found a new file '$fullfilename'",2);
+			debug("Found a new file '$fullfilename', '$truefilename'",2);
             my $qualified=1;
             # Check if file qualified
             foreach my $key (keys %IgnoreFileDir) {
+    			debug("Check if file match key '$key'",5);
                 if ($truefilename =~ /$key/) { $qualified=-1; last; }
             }
             if (scalar keys %OnlyFileDir) {
@@ -987,9 +1035,11 @@ while (<RLOGFILE>) {
             }
     		if ($qualified == -1) {
     			debug("File discarded by ignore option",2);
+                $filename='__discarded_by_ignore__';
             }
     		if ($qualified == -2) {
     			debug("File discarded by only option",2);
+                $filename='__discarded_by_only__';
             }
 		}
 		next;
@@ -1030,20 +1080,13 @@ while (<RLOGFILE>) {
 
 	# Wait for a revision
 	if ($waitfor eq "revision") {
-		if ($line =~ /^=====/) {
-			# No revision found
-			$waitfor="filename";
-			debug(" No revision found. Now waiting for '$waitfor'.",2);
-			$filename=''; $fullfilename=''; $fileformat=''; $filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
-			next;	
-		}
 		if ($line =~ /$EXTRACTFILEVERSION/i) {
 			# We found a new revision number
 			$filerevision=$1;
 			$waitfor="dateuserstate";
 			debug("Found a new revision number: $filerevision. Now waiting for '$waitfor'.",2);
 		}
-		next;
+   		next;
 	}
 
 	# Wait for date and user of revision
@@ -1068,27 +1111,7 @@ while (<RLOGFILE>) {
 		next;
 	}
 
-	# Wait for log comment
-	if ($waitfor eq "log") {
-		if ($line =~ /^=====/) {
-			$waitfor="filename";
-			# Load all data for this revision file in memory
-			debug("Info are complete, we store them",2);
-			LoadDataInMemory();
-			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
-			$filename=''; $fullfilename=''; $fileformat=''; $filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
-			next;	
-		}
-		if ($line =~ /^-----/) {
-			$waitfor="revision";
-			# Load all data for this revision file in memory
-			debug("Info are complete, we store them",2);
-			LoadDataInMemory();
-			debug(" Revision info are stored. Now waiting for '$waitfor'.",2);
-			$filerevision=''; $filedate=''; $fileuser=''; $filestate=''; $filechange=''; $filelog=''; $filelineadd=0; $filelinedel=0; $filelinechange=0;
-			next;	
-		}
-		if ($line =~ /^branches:/) { next; }
+   	if ($waitfor eq "log") {
 		# Line is log
 		debug("Found a new line for log: $line",2);
 		$filelog.="$line\n";
