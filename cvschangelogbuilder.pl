@@ -961,7 +961,7 @@ while (<RLOGFILE>) {
 	#if ($line =~ /^cvs rlog: warning: no revision/) { print("$line\n"); next; }
 
     # End of revision
-	if ($line =~ /^-----/) {
+	if ($line =~ /--------/) {
     	if ($waitfor eq "log" && $filename && $filename !~ /__discarded/) {
 			# Load all data for this revision file in memory
 			debug("Info are complete, we store them",2);
@@ -983,7 +983,7 @@ while (<RLOGFILE>) {
     }
 
     # End of file
-	if ($line =~ /^=====/) {
+	if ($line =~ /========/) {
     	if ($waitfor eq "log" && $filename && $filename !~ /__discarded/) {
 			# Load all data for this revision file in memory
 			debug("Info are complete, we store them",2);
