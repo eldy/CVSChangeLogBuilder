@@ -269,14 +269,16 @@ sub LoadDataInMemory {
 	}
 	# We know state
 	# If added or removed, value for lines added and deleted is not correct, so we download file to count them
-    if ($Output =~ /^buildhtmlreport/ && ($newfilestate eq 'added' || $newfilestate eq 'removed') && $fileformat ne 'b' && $ENABLEREQUESTFORADD) {
+    if ($Output =~ /^buildhtmlreport/ && ($newfilestate eq 'added' || $newfilestate eq 'removed') && $fileformat ne 'b' && $ENABLEREQUESTFORADD)
+    {
         my $filerevisiontoscan=$filerevision;
         if ($newfilestate eq 'removed') { $filerevisiontoscan=DecreaseVersion($filerevisiontoscan); }
         my $nbline=0;
 	    my $relativefilename=ExcludeRepositoryFromPath("$fullfilename",0,1);
 	    my $relativefilenamekeepattic=ExcludeRepositoryFromPath("$fullfilename",1,1);
-        if (! $Cache{$relativefilename}{$filerevisiontoscan} || $Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR/) {
-
+	    my $relativefilenamenospace=$relativefilename; $relativefilenamenospace=~s/\s/%20/g;
+        if (! defined($Cache{$relativefilenamenospace}{$filerevisiontoscan}) || $Cache{$relativefilenamenospace}{$filerevisiontoscan} =~ /^ERROR/)
+        {
             # If number of lines for file not available in cache file, we download file
             #--------------------------------------------------------------------------
             my $filenametoget=$relativefilenamekeepattic;
@@ -328,20 +330,20 @@ sub LoadDataInMemory {
             # Show or exploit result
             if ($errorstring) { 
                 warning(" Failed to execute command: $command: $errorstring");
-                if ($Cache{$relativefilename}{$filerevisiontoscan} =~ /^ERROR(\d*)$/) {
+                if ($Cache{$relativefilenamenospace}{$filerevisiontoscan} =~ /^ERROR(\d*)$/) {
                     # If it was not in error before, we track the error in cache file
-                    #print CACHE "$relativefilename $filerevisiontoscan ERROR".(int($1)+1)." $command: $errorstring\n";
+                    #print CACHE "$relativefilenamenospace $filerevisiontoscan ERROR".(int($1)+1)." $command: $errorstring\n";
                 }
                 else {
                     # If it was not in error before, we track the error in cache file
-                    print CACHE "$relativefilename $filerevisiontoscan ERROR1 $command: $errorstring\n";
+                    print CACHE "$relativefilenamenospace $filerevisiontoscan ERROR1 $command: $errorstring\n";
                 }
             }
             else {
                 debug(" Nb of line : $nbline",2);
-                $Cache{$relativefilename}{$filerevisiontoscan}=$nbline; 
+                $Cache{$relativefilenamenospace}{$filerevisiontoscan}=$nbline; 
                 # Save result in a cache for other run
-                print CACHE "$relativefilename $filerevisiontoscan $nbline $fileformat\n";
+                print CACHE "$relativefilenamenospace $filerevisiontoscan $nbline $fileformat\n";
             }
             close(PH);
 
@@ -357,7 +359,7 @@ sub LoadDataInMemory {
 
         }
         else {
-            $nbline=$Cache{$relativefilename}{$filerevisiontoscan};
+            $nbline=$Cache{$relativefilenamenospace}{$filerevisiontoscan};
         }
         print STDERR ".";
         if ($newfilestate eq 'added') {
