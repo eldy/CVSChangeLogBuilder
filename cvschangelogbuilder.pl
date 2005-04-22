@@ -958,6 +958,8 @@ while (<RLOGFILE>) {
 	debug("Analyze line: $line (waitfor=$waitfor)",3);
 
 	if ($line =~ /^branches:/) { next; }
+	if ($line =~ /^locks:/) { next; }
+	if ($line =~ /^access list:/) { next; }
 
 	# Check if there is a warning in rlog file
 	#if ($line =~ /^cvs rlog: warning: no revision/) { print("$line\n"); next; }
@@ -1006,45 +1008,43 @@ while (<RLOGFILE>) {
 		next;
 	}
 
+    #if ($line =~ /^cvs rlog: Logging (.*)/) { $Module=$1; } # Set module name from log file
 
-	# Wait for a new file
-	if ($waitfor eq "filename") {
-        #if ($line =~ /^cvs rlog: Logging (.*)/) { $Module=$1; } # Set module name from log file
-		if ($line =~ /$EXTRACTFILENAME/i) {
-			$filename="$1";
-			$filename =~ s/,v$//;					# Clean filename if ended with ",v"
-			$fullfilename="$ModuleForCache\@$filename";
-			my $truefilename=ExcludeRepositoryFromPath("$filename",0,1);
-			# We found a new filename
-			debug("Found a new file '$fullfilename', '$truefilename'",2);
-            my $qualified=1;
-            # Check if file qualified
-            foreach my $key (keys %IgnoreFileDir) {
-    			debug("Check if file match key '$key'",5);
-                if ($truefilename =~ /$key/) { $qualified=-1; last; }
+	# New file found (even if not expected)
+	if ($line =~ /$EXTRACTFILENAME/i) {
+		$filename="$1";
+		$filename =~ s/,v$//;					# Clean filename if ended with ",v"
+		$fullfilename="$ModuleForCache\@$filename";
+		my $truefilename=ExcludeRepositoryFromPath("$filename",0,1);
+		# We found a new filename
+		debug("Found a new file '$fullfilename', '$truefilename'",2);
+        my $qualified=1;
+        # Check if file qualified
+        foreach my $key (keys %IgnoreFileDir) {
+			debug("Check if file match key '$key'",5);
+            if ($truefilename =~ /$key/) { $qualified=-1; last; }
+        }
+        if (scalar keys %OnlyFileDir) {
+            $qualified=-2; 
+            foreach my $key (keys %OnlyFileDir) {
+                if ($truefilename =~ /$key/) { $qualified=1; last; }
             }
-            if (scalar keys %OnlyFileDir) {
-                $qualified=-2; 
-                foreach my $key (keys %OnlyFileDir) {
-                    if ($truefilename =~ /$key/) { $qualified=1; last; }
-                }
-            }
-    		if ($qualified > 0) {
-    			debug("File is qualified to be included in report",2);
-    			$waitfor="symbolic_name";
-	    		$maxincludedver{"$fullfilename"}=0;
-			    $minexcludedver{"$fullfilename"}=0;
-            }
-    		if ($qualified == -1) {
-    			debug("File discarded by ignore option",2);
-                $filename='__discarded_by_ignore__';
-            }
-    		if ($qualified == -2) {
-    			debug("File discarded by only option",2);
-                $filename='__discarded_by_only__';
-            }
-		}
-		next;
+        }
+		if ($qualified > 0) {
+			debug("File is qualified to be included in report",2);
+			$waitfor="symbolic_name";
+    		$maxincludedver{"$fullfilename"}=0;
+		    $minexcludedver{"$fullfilename"}=0;
+        }
+		if ($qualified == -1) {
+			debug("File discarded by ignore option",2);
+            $filename='__discarded_by_ignore__';
+        }
+		if ($qualified == -2) {
+			debug("File discarded by only option",2);
+            $filename='__discarded_by_only__';
+        }
+	    next;
 	}
 
 	# Wait for symbolic names area
@@ -1942,7 +1942,7 @@ writeoutputfile "<th width=\"$widthfulldate\">Full date</th>";
 writeoutputfile "<th width=\"80\">Tags</th>";
 writeoutputfile "<th>&nbsp;</th>";
 writeoutputfile "</tr>\n";
-foreach my $tag (reverse sort { $tagsfulldate{$a} <=> $tagsfulldate{$b} } keys %tagsfulldate) {
+foreach my $tag (reverse sort { "$tagsfulldate{$a}.$a" cmp "$tagsfulldate{$b}.$b" } keys %tagsfulldate) {
     writeoutputfile "<tr>";
     writeoutputfile "<td valign=\"top\">".FormatDate($tagsshortdate{$tag})."</td>";
     writeoutputfile "<td valign=\"top\">";
