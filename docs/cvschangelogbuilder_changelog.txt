@@ -4,12 +4,14 @@ $Revision$ - $Author$ - $Date$
 
 2.1
 
+- Fix: A better handling of corrupted rlog file.
+- Fix: Minor fixes.
+- Fix: Cache for files with space in name works correctly.
 - New: Added option -ignore and -only
 - New: Chart for commit and files by developpers are limited to 5 most
   active users and group others as "Others".
 - New: Added a date tag reports
 - Added tags informations in last commit list
-- Fix: Minor fixes.
 
 
 2.0
