@@ -2022,7 +2022,7 @@ foreach my $dateuser (reverse sort keys %DateUser) {
     writeoutputfile "</td></tr>";
     if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) {
         my $rest="some"; # TODO put here value of not shown commits
-        writeoutputfile "<tr><td valign=\"top\" colspan=\"3\" align=\"left\">Other commits are hidden...</td></tr>";
+        writeoutputfile "<tr><td valign=\"top\" colspan=\"4\" align=\"left\">Other commits are hidden...</td></tr>";
         last;
     }
 }	
