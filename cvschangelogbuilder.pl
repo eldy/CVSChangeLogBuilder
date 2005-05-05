@@ -16,12 +16,13 @@ my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
 my $VERSION="2.1 (build $REVISION)";
 
 # ---------- Init variables --------
-use vars qw/ $TagStart $Branch $TagEnd /;
+use vars qw/ $TagStart $Branch $TagEnd $Since /;
 my $Debug=0;
 my $DIR;
 my $PROG;
 my $Extension;
 my $Help='';
+my $Since='';
 my $TagStart='';
 my $TagEnd='';
 my $Module='';
@@ -671,6 +672,7 @@ if ($QueryString =~ /debug=(\d+)/i)    			{ $Debug=$1; }
 if ($QueryString =~ /m(?:odule|)=([^\s]+)/i)	{ $Module=$1; }
 if ($QueryString =~ /output=([^\s]+)/i)   		{ $Output=$1; }
 if ($QueryString =~ /branch=([^\s]+)/i)			{ $Branch=$1; }
+if ($QueryString =~ /since=([^\s]+)/i) 		{ $Since=$1; }
 if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
@@ -689,6 +691,7 @@ debug("Parameter Output       : $Output");
 debug("Parameter OutputDir    : $OutputDir");
 debug("Parameter Branch       : $Branch");
 debug("Parameter ViewCvsUrl   : $ViewCvsUrl");
+debug("Parameter Since        : $Since");
 debug("Parameter IgnoreFileDir: ".join(',',keys %IgnoreFileDir));
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
@@ -904,10 +907,10 @@ if (! $RLogFile) {
 	my $command;
 	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
 	if ($Branch) {
-		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -r${Branch} $Module";
+		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -r${Branch} ".($Since? " -d'" . $Since . "' " : ""). "$Module";
 	}
 	else {
-		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -b ".($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
+		$command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}." rlog -b ".($Since? " -d'" . $Since . "' " : "").($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
 	}
 	writeoutput("Downloading temporary cvs rlog file '$TmpFile'\n",1);
 	writeoutput("with command '$command'\n",1);
