@@ -1,4 +1,3 @@
-
 body { 
 	background-color: #FFFFFF;
 	font: 14px verdana,arial;
@@ -20,4 +19,10 @@ td.CFAQ		{ font: 14px verdana,arial; color: #000000; font-family: sans-serif; te
 .CProblem	{ font: 14px verdana,arial; color: #660000; font-family: sans-serif; text-decoration: none; }
 .CSolution	{ font: 14px verdana,arial; color: #448866; font-family: sans-serif; text-decoration: none; }
 
-input     { font: 12px verdana,arial; font-family: sans-serif; }
+input     {
+	font-family: arial,verdana,helvetica, sans-serif;
+	font-weight: normal;
+	border: 1px solid #DDC8C8;
+	background-position : bottom;
+    font: 12px verdana,arial;
+}
