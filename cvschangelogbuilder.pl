@@ -525,7 +525,7 @@ sub FormatCvsFileLink {
         $url =~ s/$Module\@//g;
         $string.="$url";
         $string.="?rev=".$version;
-    	return "<a href=\"$string\">$url</a>";
+    	return "<a href=\"$string\" target=\"_newcvs\">$url</a>";
 	}
 	else {
 	    return "$url";   
@@ -554,7 +554,7 @@ sub FormatCvsDiffLink {
         else {
             $string.="?rev=".$version;
         }    
-    	return "<a href=\"$string\">$label</a>";
+    	return "<a href=\"$string\" target=\"_newcvs\">$label</a>";
 	}
 	else {
 	    return "$url";   
