@@ -13,7 +13,7 @@ use Time::Local;
 # Defines
 #-------------------------------------------------------
 my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
-my $VERSION="2.1 (build $REVISION)";
+my $VERSION="2.2 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd $Since /;
@@ -101,6 +101,15 @@ my %UserChangeLineDel=();
 my %UserChangeLineChange=();
 # For html report output
 my $MAXLASTLOG=200;
+my $SORTBYREVISION=0;
+my $LOOSECOMMITS=0;
+my $NOSUMMARY=0;
+my $NOLINESOFCODE=0;
+my $NODEVELOPERS=0;
+my $NODAYSOFWEEK=0;
+my $NOHOURS=0;
+my $NOTAGS=0;
+my $NOLASTLOGS=0;
 
 
 #------------------------------------------------------------------------------
@@ -706,9 +715,18 @@ if (! $ENV{"SERVER_NAME"}) {
 my %param=();
 if ($Output) {
     if ($Output =~ s/:(.*)//g) {
-        # There is some parameter on output option
+        # There is some parameters on output option
         foreach my $key (split(/,/,$1)) { $param{$key}=1; }
         if ($param{'nolimit'}) { $MAXLASTLOG=0; }
+        if ($param{'sortbyrevision'}) { $SORTBYREVISION=1; }
+        if ($param{'loosecommits'}) { $LOOSECOMMITS=1; }
+        if ($param{'nosummary'}) { $NOSUMMARY=1; }
+        if ($param{'nolinesofcode'}) { $NOLINESOFCODE=1; }
+        if ($param{'nodevelopers'}) { $NODEVELOPERS=1; }
+        if ($param{'nodaysofweek'}) { $NODAYSOFWEEK=1; }
+        if ($param{'nohours'}) { $NOHOURS=1; }
+        if ($param{'notags'}) { $NOTAGS=1; }
+        if ($param{'nolastlogs'}) { $NOLASTLOGS=1; }
     }
 	my %allowedvalueforoutput=(
 	"listdeltabydate"=>1,
@@ -732,7 +750,7 @@ if ($Help || ! $Output) {
 	writeoutput("\nUsage:\n");
 	writeoutput("  $PROG.$Extension -output=outputmode [-m=module -d=repository] [options]\n");
 	writeoutput("\n");
-	writeoutput("Where 'outputmode' is:\n");
+	writeoutput("Where 'output' is:\n");
 	writeoutput("  listdeltabydate  To get a changelog between 2 versions, sorted by date\n");
 	writeoutput("  listdeltabylog   To get a changelog between 2 versions, sorted by log\n");
 	writeoutput("  listdeltabyfile  To get a changelog between 2 versions, sorted by file\n");
@@ -741,8 +759,22 @@ if ($Help || ! $Output) {
 	writeoutput("\n");
 	writeoutput("  Note that \"between 2 versions\" means (depends on tagstart/tagend options):\n");
 	writeoutput("  * from start to a tagged version (version changes included)\n");
-	writeoutput("  * from a start version (excluded) to another tagged version (included)\n");
+	writeoutput("  * from a tagged version (excluded) to another tagged version (included)\n");
 	writeoutput("  * or from a tagged version until now (version changes excluded)\n");
+	writeoutput("\n");
+	writeoutput("  You can also add extra parameters when output=buildhtmlreport by adding them\n");
+	writeoutput("  after a coma, like this: -output=buildhtmlreport,param1,param2\n");
+	writeoutput("  This is extra paremeters available for -output=buildhtmlreport mode:\n");
+	writeoutput("    nosummary         To remove summary part\n");
+	writeoutput("    nolinesofcode     To remove lines of code part\n");
+	writeoutput("    nodevelopers      To remove developers part\n");
+   	writeoutput("    nodaysofweek      To remove days of week part\n");
+	writeoutput("    nohours           To remove hours part\n");
+	writeoutput("    notags            To remove tags part\n");
+	writeoutput("    nolastlogs        To remove last logs part\n");
+	writeoutput("    nolimit           To not limit last logs to last $MAXLASTLOG\n");
+	writeoutput("    sortbyrevision    To sort last logs by revision\n");
+	writeoutput("    loosecommits      To separate commits for same log by spaces\n");
 	writeoutput("\n");
 	writeoutput("The 'module' and 'repository' are the CVS module name and the CVS repository.\n");
 	writeoutput("  If current directory is the root of a CVS project built from a cvs checkout,\n");
@@ -760,23 +792,23 @@ if ($Help || ! $Output) {
 	writeoutput("  BRANCH. Also, it must be the default branch, if not, you MUST use -branch to\n");
 	writeoutput("  give the name of the branch, otherwise you will get unpredicable result.\n");
 	writeoutput("\n");
-	writeoutput("  -ssh                To run CVS through ssh (this only set CVS_RSH=\"ssh\")\n");
-	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exist localy, you can use\n");
-	writeoutput("                       this option to avoid log download, for a faster result.\n");
+	writeoutput("  -ssh                To run CVS through ssh (this set env var CVS_RSH=\"ssh\")\n");
+	writeoutput("  -rlogfile=rlogfile  If an up-to-date log file already exists localy, you can\n");
+	writeoutput("                      use this option to avoid log download, for a faster result.\n");
 	writeoutput("  -keeprlogfile       Once process is finished, you can ask to not remove the\n");
-	writeoutput("                       downloaded log file.\n");
+	writeoutput("                      downloaded log file.\n");
 	writeoutput("  -dir=dirname        Output is built in directory dirname.\n");
 	writeoutput("  -viewcvsurl=viewcvsurl   File's revisions in reports built by buildhtmlreport\n");
 	writeoutput("                           output are links to \"viewcvs\". String '__MODULE__'\n");
 	writeoutput("                           will be replaced by name of CVS module.\n");
 	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
-	writeoutput("  -debug=x            To output on stderr debug info with level x\n");
+	writeoutput("  -debug=x            To output on stderr some debug info with level x\n");
 	writeoutput("\n");
-	writeoutput("Example:\n");
-	writeoutput("  $PROG.$Extension -module=myproject -output=listdeltabyfile -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
-	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabydate -d=:ntserver:127.0.0.1:d:/mycvsdir\n");
-	writeoutput("  $PROG.$Extension -module=mymodule  -output=listdeltabylog  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n");
-	writeoutput("  $PROG.$Extension -module=mymodule  -output=buildhtmlreport -d=:ext:user\@cvs.sourceforge.net:/cvsroot -viewcvsurl=\"http://savannah.nongnu.org/cgi-bin/viewcvs/project/__MODULE__\"\n");
+	writeoutput("Examples:\n");
+	writeoutput("  $PROG.$Extension -output=listdeltabyfile -module=myproject -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
+	writeoutput("  $PROG.$Extension -output=listdeltabydate -module=mymodule  -d=:ntserver:127.0.0.1:d:/mycvsdir\n");
+	writeoutput("  $PROG.$Extension -output=listdeltabylog  -module=mymodule  -d=:pserver:user\@127.0.0.1:/usr/local/cvsroot\n");
+	writeoutput("  $PROG.$Extension -output=buildhtmlreport -module=mymodule  -d=:ext:user\@cvs.sourceforge.net:/cvsroot -viewcvsurl=\"http://savannah.nongnu.org/cgi-bin/viewcvs/project/__MODULE__\"\n");
 	writeoutput("\n");
 	exit 0;
 }
@@ -1515,30 +1547,30 @@ writeoutputfile "<tr><td class=\"aws\" colspan=2>Date&nbsp;analysis</td><td clas
 my $endtime=time();
 writeoutputfile " (Built in ".($endtime-$nowtime)."s)</td></tr>\n";
 
-writeoutputfile <<EOF;
-</table></td></tr></table>
-EOF
+writeoutputfile "</table></td></tr></table>";
 
 
 # LINKS
 #------
-writeoutputfile <<EOF;
-</td><td>
-$headstring<br>
-<a href="#summary">Summary</a> &nbsp; 
-<a href="#linesofcode">Lines&nbsp;of&nbsp;code</a> &nbsp; 
-<a href="#developers">Developers&nbsp;activity</a> &nbsp; 
-<a href="#daysofweek">Days&nbsp;of&nbsp;week</a> &nbsp; 
-<a href="#hours">Hours</a> &nbsp;
-<a href="#tags">Tags</a> &nbsp;
-<a href="#lastlogs">Last&nbsp;commits</a> &nbsp;
-</td></tr></table>
-<br />
-EOF
+writeoutputfile "</td><td>";
+writeoutputfile "$headstring<br />";
+
+writeoutputfile '<a href="#summary">Summary</a> &nbsp; ' if (!$NOSUMMARY);
+writeoutputfile '<a href="#linesofcode">Lines&nbsp;of&nbsp;code</a> &nbsp; ' if (!$NOLINESOFCODE);
+writeoutputfile '<a href="#developers">Developers&nbsp;activity</a> &nbsp; ' if (!$NODEVELOPERS);
+writeoutputfile '<a href="#daysofweek">Days&nbsp;of&nbsp;week</a> &nbsp; ' if (!$NODAYSOFWEEK);
+writeoutputfile '<a href="#hours">Hours</a> &nbsp;' if (!$NOHOURS);
+writeoutputfile '<a href="#tags">Tags</a> &nbsp;' if (!$NOTAGS);
+writeoutputfile '<a href="#lastlogs">Last&nbsp;commits</a> &nbsp;' if (!$NOLASTLOGS);
+
+writeoutputfile "</td></tr></table>";
+writeoutputfile "<br />";
 
 
 # SUMMARY
 #--------
+if (!$NOSUMMARY) {
+
 writeoutputfile <<EOF;
 <a name="summary">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1602,9 +1634,12 @@ writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
 
+}
 
 # LINES OF CODE
 #--------------
+if (!$NOLINESOFCODE) {
+
 writeoutputfile <<EOF;
 <a name="linesofcode">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1662,9 +1697,12 @@ writeoutputfile <<EOF;
 </td></tr></table></td></tr></table><br />
 EOF
 
+}
 
 # BY DEVELOPERS
 #--------------
+if (!$NODEVELOPERS) {
+
 my $MAXABS=5;
 writeoutputfile <<EOF;
 <a name="developers">&nbsp;</a><br />
@@ -1826,9 +1864,12 @@ writeoutputfile <<EOF;
 </td></tr></table><br />
 EOF
 
+}
 
 # BY DAYS OF WEEK
 #----------------
+if (!$NODAYSOFWEEK) {
+
 writeoutputfile <<EOF;
 <a name="daysofweek">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1877,9 +1918,12 @@ writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
 
+}
 
 # BY HOURS
 #---------
+if (!$NOHOURS) {
+
 writeoutputfile <<EOF;
 <a name="hours">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1926,6 +1970,7 @@ writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
 
+}
 
 my $widthdate=90;
 my $widthfulldate=160;
@@ -1934,6 +1979,8 @@ my $widthtag=100;
 
 # TAGS
 #-----
+if (!$NOTAGS) {
+
 writeoutputfile <<EOF;
 <a name="tags">&nbsp;</a><br />
 <table class="aws_border" border="0" cellpadding="2" cellspacing="0" width="100%">
@@ -1963,9 +2010,12 @@ writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
 
+}
 
 # LASTLOGS
 #---------
+if (!$NOLASTLOGS) {
+
 my $cursor=0;
 writeoutputfile <<EOF;
 <a name="lastlogs">&nbsp;</a><br />
@@ -1994,36 +2044,69 @@ foreach my $dateuser (reverse sort keys %DateUser) {
     writeoutputfile "<td valign=\"top\">".FormatDate($date)."</td>";
     writeoutputfile "<td valign=\"top\">".$user."</td>";
     writeoutputfile "<td class=\"aws\">";
+    my (%date_user_commits, @normal_order);
 	foreach my $logcomment (sort keys %{$DateUserLog{$dateuser}}) {
+        my ($one_commit, $one_revision) = ("", "");
         $cursor++;
         my $comment=$logcomment;
 		chomp $comment;
 		$comment =~ s/\r$//;
+		$one_commit .= "<p>" if ($LOOSECOMMITS);
 		foreach my $logline (split(/\n/,$comment)) {
-			writeoutputfile "<b>".CleanFromTags($logline)."</b><br>\n";
+#			writeoutputfile "<b>".CleanFromTags($logline)."</b><br>\n";
+			$one_commit .= "<b>".CleanFromTags($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
 			$filerevision=~/(.*)\s([\d\.]+)/;
 			my ($file,$version)=($1,$2);
-			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
-			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
+#			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
+#			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) { debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3); next; }
+			$one_revision = $file.$version;
+			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) {
+				debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3);
+				$date_user_commits{$one_revision} = $one_commit;
+				next;
+			}
+			if ($minexcludedver{"$file"} && (CompareVersionBis($2,$minexcludedver{"$file"}) <= 0)) {
+				debug("For file '$file' $2 <= minexcludedversion= ".$minexcludedver{"$file"},3);
+				$date_user_commits{$one_revision} = $one_commit;
+				next;
+			}
 			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
 			$state =~ s/_forced//;
-#			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,0),$version)." $version (".FormatState($state);
-			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
+#			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
+			$one_commit .= "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
 			my $lines=$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision};
-			writeoutputfile ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
-			writeoutputfile ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
-			writeoutputfile ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
+#			writeoutputfile ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
+#	    	writeoutputfile ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
+#			writeoutputfile ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
+			$one_commit .= ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
+			$one_commit .= ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
+			$one_commit .= ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
             if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
                 if ($state eq 'changed') {
-			        writeoutputfile ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
+#			        writeoutputfile ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
+				$one_commit .= ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
 			    }
             }
-			writeoutputfile ")<br>\n";
+#			writeoutputfile ")<br>\n";
+			$one_commit .= ")<br>\n";
 		}
+    	$one_commit .= "</p>" if ($LOOSECOMMITS);
+	    $date_user_commits{$one_revision} = $one_commit;
+    	push @normal_order, $one_revision;
         if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) { last; }
 	}
+    # sort by file-revision
+    if ($SORTBYREVISION) {
+    	foreach my $commitline (reverse sort keys %date_user_commits) {
+    		writeoutputfile $date_user_commits{$commitline};
+    	}
+    } else {
+      	foreach my $commitline (@normal_order) {
+    		writeoutputfile $date_user_commits{$commitline};
+    	}
+    }
     writeoutputfile "</td></tr>";
     if ($MAXLASTLOG && $cursor >= $MAXLASTLOG) {
         my $rest="some"; # TODO put here value of not shown commits
@@ -2035,6 +2118,8 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 writeoutputfile <<EOF;
 </table></td></tr></table><br />
 EOF
+
+}
 
 }   # End buildhtmlreport
 
