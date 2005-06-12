@@ -19,11 +19,11 @@ listdeltabylog		To build a changelog by change comment.
 buildhtmlreport     To build an html report of project CVS activity.
 
 License: GNU GPL (GNU General Public License. See LICENSE file)
-Version : 2.1
-Release date: April 2005
+Version : 2.2
+Release date: June 2005
 Platforms: All (Linux, NT, BSD, Solaris and other *NIX's, BeOS, OS/2...)
 Author: Laurent Destailleur <eldy@users.sourceforge.net>
-cvschangelogbuilder official web site and latest version: http://cvschangelogbuilder.sourceforge.net
+cvschangelogbuilder official web site and latest version: http://cvschangelogb.sourceforge.net
 
 
 I - Files
