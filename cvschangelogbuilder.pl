@@ -1227,8 +1227,6 @@ else {
 <style type="text/css">
 <!--
 body { font: 11px verdana, arial, helvetica, sans-serif; background-color: #FFFFFF; margin-top: 0; margin-bottom: 0; }
-.aws_bodyl  { }
-.aws_border { background-color: #FFE0B0; padding: 1px 1px 1px 1px; margin-top: 0; margin-bottom: 0; }
 .aws_title  { font: 13px verdana, arial, helvetica, sans-serif; font-weight: bold; background-color: #FFE0B0; text-align: center; margin-top: 0; margin-bottom: 0; padding: 1px 1px 1px 1px; color: #000000; }
 .aws_blank  { font: 13px verdana, arial, helvetica, sans-serif; background-color: #FFE0B0; text-align: right; margin-bottom: 0; padding: 1px 1px 1px 1px; }
 .aws_data {
@@ -1237,13 +1235,6 @@ body { font: 11px verdana, arial, helvetica, sans-serif; background-color: #FFFF
 	border-left-width: 0px;  
 	border-right-width: 0px; 
 	border-bottom-width: 0px;
-}
-.aws_formfield { font: 13px verdana, arial, helvetica; }
-.aws_button {
-	font-family: arial,verdana,helvetica, sans-serif;
-	font-size: 12px;
-	border: 1px solid #ccd7e0;
-	background-image : url(/icon/other/button.gif);
 }
 th		{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 2px 1px 1px; font: 11px verdana, arial, helvetica, sans-serif; text-align:center; color: #000000; }
 th.aws	{ border-color: #ECECEC; border-left-width: 0px; border-right-width: 1px; border-top-width: 0px; border-bottom-width: 1px; padding: 1px 2px 1px 1px; font-size: 13px; font-weight: bold; }
@@ -1677,7 +1668,7 @@ else {
           dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
           #borderclrs        => [ qw(blue green pink blue) ],
     ) or die $graph->error;
-#    # Defini la légende
+#    # Define legend
 #    $graph->set_legend(("All developers"));
 #    $graph->set_legend_font("");
 #    $graph->set(legend_placement=>'Right');
@@ -1846,7 +1837,7 @@ if (scalar keys %nbcommit > 0) {
 #              dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..($MAXABS-1)) ]
               #borderclrs        => [ qw(blue green pink blue) ],
         ) or die $graph->error;
-        # Defini la légende
+        # Define legend
         $graph->set_legend(@legend);
         $graph->set_legend_font("");
         $graph->set(legend_placement=>'Right');
