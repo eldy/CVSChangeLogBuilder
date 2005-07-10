@@ -64,9 +64,8 @@ my %IgnoreFileDir=();
 my %OnlyFileDir=();
 my %colorstate=('added'=>'#008822','changed'=>'#888888','removed'=>'#880000');
 # ---------- Init Regex --------
-use vars qw/ $regclean1 $regclean2 /;
-$regclean1=qr/<(recnb|\/td)>/i;
-$regclean2=qr/<\/?[^<>]+>/i;
+use vars qw/ $reg1 /;
+$reg1=qr/x/i;
 # ---------- Init hash arrays --------
 # For all
 my %maxincludedver=();
@@ -474,16 +473,16 @@ sub LoadDataInMemory {
 }
 
 #------------------------------------------------------------------------------
-# Function:     Clean tags in a string
-# Parameters:   stringtodecode
+# Function:     Formate a string to an html readable string
+# Parameters:   stringtoencode
 # Input:        None
 # Output:       None
-# Return:		decodedstring
+# Return:		encodedstring
 #------------------------------------------------------------------------------
-sub CleanFromTags {
+sub HtmlEntities {
 	my $stringtoclean=shift;
-	$stringtoclean =~ s/$regclean1/ /g;	# Replace <recnb> or </td> with space
-	$stringtoclean =~ s/$regclean2//g;	# Remove <xxx>
+    $stringtoclean =~ s/>/&gt;/g;           # Replace html tags with save &gt;
+    $stringtoclean =~ s/</&lt;/g;           # and &lt;
 	return $stringtoclean;
 }
 
@@ -2044,8 +2043,8 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		$comment =~ s/\r$//;
 		$one_commit .= "<p>" if ($LOOSECOMMITS);
 		foreach my $logline (split(/\n/,$comment)) {
-#			writeoutputfile "<b>".CleanFromTags($logline)."</b><br>\n";
-			$one_commit .= "<b>".CleanFromTags($logline)."</b><br>\n";
+#			writeoutputfile "<b>".HtmlEntities($logline)."</b><br>\n";
+			$one_commit .= "<b>".HtmlEntities($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
 			$filerevision=~/(.*)\s([\d\.]+)/;
