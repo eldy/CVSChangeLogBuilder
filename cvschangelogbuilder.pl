@@ -757,12 +757,13 @@ if ($Help || ! $Output) {
 	writeoutput("  buildhtmlreport  To build an html report\n");
 	writeoutput("\n");
 	writeoutput("  Note that \"between 2 versions\" means (depends on tagstart/tagend options):\n");
-	writeoutput("  * from start to a tagged version (version changes included)\n");
-	writeoutput("  * from a tagged version (excluded) to another tagged version (included)\n");
-	writeoutput("  * or from a tagged version until now (version changes excluded)\n");
+	writeoutput("    * from start to a tagged version (version changes included)\n");
+	writeoutput("    * from a tagged version (excluded) to another tagged version (included)\n");
+	writeoutput("    * or from a tagged version until now (version changes excluded)\n");
 	writeoutput("\n");
 	writeoutput("  You can also add extra parameters when output=buildhtmlreport by adding them\n");
-	writeoutput("  after a coma, like this: -output=buildhtmlreport,param1,param2\n");
+	writeoutput("  after a colon and separated by a comma, like this:\n");
+	writeoutput("    -output=buildhtmlreport:param1,param2\n");
 	writeoutput("  This is extra paremeters available for -output=buildhtmlreport mode:\n");
 	writeoutput("    nosummary         To remove summary part\n");
 	writeoutput("    nolinesofcode     To remove lines of code part\n");
