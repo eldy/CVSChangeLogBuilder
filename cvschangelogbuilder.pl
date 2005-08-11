@@ -17,14 +17,12 @@ my $VERSION="2.2 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd $Since /;
+$TagStart=$Branch=$TagEnd=$Since='';
 my $Debug=0;
 my $DIR;
 my $PROG;
 my $Extension;
 my $Help='';
-my $Since='';
-my $TagStart='';
-my $TagEnd='';
 my $Module='';
 my $ModuleForCache='';
 my $Output='';		# Default will be "listdeltabydate"
@@ -34,8 +32,6 @@ my $UseSsh=0;
 my $RLogFile;
 my $KeepRlogFile=0;
 my $RepositoryPath;
-my $nowtime = my $nowweekofmonth = my $nowdaymod = my $nowsmallyear = 0; 
-my $nowsec = my $nowmin = my $nowhour = my $nowday = my $nowmonth = my $nowyear = my $nowwday = 0;
 my $filename='';
 my $fullfilename='';
 my %filesym=();
@@ -1770,10 +1766,11 @@ if (scalar keys %newnbcommit > 1) {
         print IMG $gd->png;
         close IMG;
         # End build graph
+
         # Build graph for developer file ratio, hash used: newnbfile{developer}=nb
         my $pngfilefile="${OutputRootFile}_developersfile.png";
-        my @data = ([keys %newnbfile],[values %newnbfile]);
-        my $graph = GD::Graph::pie->new(170, 138);
+        @data = ([keys %newnbfile],[values %newnbfile]);
+        $graph = GD::Graph::pie->new(170, 138);
         $col=$color_file; $col=~s/#//;
         $graph->set( 
               title             => 'Different files',
@@ -1783,7 +1780,7 @@ if (scalar keys %newnbcommit > 1) {
               accentclr         => $color_grey,
               dclrs             => [ map{ sprintf("#%06x",(hex($col)+(hex("050503")*$_))) } (0..((scalar keys %newnbfile)-1)) ]
         ) or die $graph->error;
-        my $gd = $graph->plot(\@data) or die $graph->error;
+        $gd = $graph->plot(\@data) or die $graph->error;
         open(IMG, ">${OutputDir}$pngfilefile") or die $!;
         binmode IMG;
         print IMG $gd->png;
