@@ -55,10 +55,10 @@
 		<Includes_VB_Runtime>N</Includes_VB_Runtime>
 		<Includes_DirectX>N</Includes_DirectX>
 		<File_Info>
-			<Filename_Versioned>cvschangelogbuilder-1.1.tgz</Filename_Versioned>
-			<Filename_Previous>cvschangelogbuilder-1.0.tgz</Filename_Previous>
-			<Filename_Generic>cvschangelogbuilder.tgz</Filename_Generic>
-			<Filename_Long>cvschangelogbuilder.tgz</Filename_Long>
+			<Filename_Versioned>cvschangelogbuilder-2.2.tar.gz</Filename_Versioned>
+			<Filename_Previous>cvschangelogbuilder-2.1.tar.gz</Filename_Previous>
+			<Filename_Generic>cvschangelogbuilder.tar.gz</Filename_Generic>
+			<Filename_Long>cvschangelogbuilder.tar.gz</Filename_Long>
 			<File_Size_Bytes>128271</File_Size_Bytes>
 			<File_Size_K>125</File_Size_K>
 			<File_Size_MB>0.12</File_Size_MB>
@@ -107,8 +107,8 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 			<Application_XML_File_URL>http://cvschangelogb.sourceforge.net/docs/pad_cvschangelogbuilder.xml</Application_XML_File_URL>
 		</Application_URLs>
 		<Download_URLs>
-			<Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tgz</Primary_Download_URL>
-			<Secondary_Download_URL>http://prdownloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-1.1.tgz</Secondary_Download_URL>
+			<Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tar.gz</Primary_Download_URL>
+			<Secondary_Download_URL>http://prdownloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-2.2.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
