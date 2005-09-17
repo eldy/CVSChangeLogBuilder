@@ -2,6 +2,18 @@ CVSChangelogBuilder Changelog
 -----------------------------
 $Revision$ - $Author$ - $Date$
 
+
+2.2
+
+- Fixed: Remove warning in diagnostic mode
+- Fixed: doc to use buildhtmlreport options
+- Fixed: [ 1004884 ] HTML tags is removed from HTML output
+- New: options: nosummary, nolinesofcode, nodevelopers, nodaysofweek,
+  nohours, notags, nolastlogs, nolimit,sortbyrevision, loosecommits
+- New: cvs links open a new window.
+- Fixed: Support filanmes with spaces in it
+ 	
+
 2.1
 
 - Fix: A better handling of corrupted rlog file.
