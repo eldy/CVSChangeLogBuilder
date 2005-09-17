@@ -20,7 +20,7 @@ buildhtmlreport     To build an html report of project CVS activity.
 
 License: GNU GPL (GNU General Public License. See LICENSE file)
 Version : 2.2
-Release date: June 2005
+Release date: September 2005
 Platforms: All (Linux, NT, BSD, Solaris and other *NIX's, BeOS, OS/2...)
 Author: Laurent Destailleur <eldy@users.sourceforge.net>
 cvschangelogbuilder official web site and latest version: http://cvschangelogb.sourceforge.net
