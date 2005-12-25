@@ -10,7 +10,7 @@ use Cwd;
 
 $PROJECT="cvschangelogbuilder";
 $MAJOR="2";
-$MINOR="2";
+$MINOR="3";
 $RPMSUBVERSION="1";
 @LISTETARGET=("TGZ","ZIP","RPM","DEB","EXE");   # Possible packages
 %REQUIREMENTTARGET=(                            # Tool requirement for each package
