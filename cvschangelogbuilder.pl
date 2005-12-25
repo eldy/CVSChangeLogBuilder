@@ -865,7 +865,7 @@ writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
 # Define ModuleForCache (use for cache file and fullfilename)
 $ModuleForCache=$Module;
-$ModuleForCache =~ s/\//_/g; # In case $Module contains '/' because caught from a subdirectory of CVS tree
+$ModuleForCache =~ s/[\/\\\s]/_/g; # In case $Module contains '/','\',' '
 
 
 # Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
@@ -933,7 +933,6 @@ if (! $RLogFile) {
 	my $TmpFile="$TmpDir/$PROG.$ModuleForCache.$$.tmp";
 	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file '$TmpFile' for writing. Check directory and permissions.");
 	my $command;
-	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
 	if ($Branch) {
 		$command="$CVSCLIENT $COMP -d \"" . $ENV{"CVSROOT"}."\" rlog -r${Branch} " . ($Since? " -d'" . $Since . "' " : "") . "\"$Module\"";
 	}
@@ -1169,7 +1168,7 @@ foreach my $tag (keys %tagsshortdate) {
 
 # BUILD OUTPUT
 #------------------------
-my $OutputRootFile="${PROG}_".($Branch?"(${Branch})_$Module":"$Module");
+my $OutputRootFile="${PROG}_".($Branch?"(${Branch})_${ModuleForCache}":"${ModuleForCache}");
 
 # Start of true output
 if ($OutputDir) {
@@ -1182,10 +1181,10 @@ writeoutput("\nBuild output for option '$Output'\n",1);
 my $headstring='';
 my $rangestring='';
 if ($Output !~ /buildhtmlreport$/) {
-    $headstring.="\nChanges for $Module";
+    $headstring.="\nChanges for '$Module'";
 }
 else {
-    $headstring.="\nCVS report for module <b>$Module</b>";
+    $headstring.="\nCVS report for module <b>'$Module'</b>";
 }
 if ($Branch) {
     $headstring.=" in branch $Branch";
