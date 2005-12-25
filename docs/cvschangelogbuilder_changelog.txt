@@ -3,6 +3,16 @@ CVSChangelogBuilder Changelog
 $Revision$ - $Author$ - $Date$
 
 
+2.3
+
+- Fix: The user is not case sensitive.
+- Fix: cvschangelogbuilder died for some CVS root in Windows.
+- Fix: Support module that contains spaces on it.
+- New: Added -only option (for report on only files that match a regex).
+- More precise error message when writing png files.
+- Updated documentation.
+
+
 2.2
 
 - Fixed: Remove warning in diagnostic mode

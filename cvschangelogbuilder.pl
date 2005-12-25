@@ -798,6 +798,7 @@ if ($Help || ! $Output) {
 	writeoutput("                           output are links to \"viewcvs\". String '__MODULE__'\n");
 	writeoutput("                           will be replaced by name of CVS module.\n");
 	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
+	writeoutput("  -only=file/dir      To have reports only on file/dir that match.\n");
 	writeoutput("  -debug=x            To output on stderr some debug info with level x\n");
 	writeoutput("\n");
 	writeoutput("Examples:\n");
@@ -985,7 +986,7 @@ while (<RLOGFILE>) {
 	chomp $_; s/\r$//;
 	my $line="$_";
 
-	debug("Analyze line: $line (waitfor=$waitfor)",3);
+	debug("New read line: $line (waitfor=$waitfor)",3);
 
 	if ($line =~ /^branches:/) { next; }
 	if ($line =~ /^locks:/) { next; }
@@ -1051,12 +1052,13 @@ while (<RLOGFILE>) {
         my $qualified=1;
         # Check if file qualified
         foreach my $key (keys %IgnoreFileDir) {
-			debug("Check if file match key '$key'",5);
+			debug("Check if file match IgnoreFileDir key '$key'",5);
             if ($truefilename =~ /$key/) { $qualified=-1; last; }
         }
         if (scalar keys %OnlyFileDir) {
             $qualified=-2; 
             foreach my $key (keys %OnlyFileDir) {
+    			debug("Check if file match OnlyFileDir key '$key'",5);
                 if ($truefilename =~ /$key/) { $qualified=1; last; }
             }
         }
