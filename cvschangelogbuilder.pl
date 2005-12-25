@@ -2042,7 +2042,6 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		$comment =~ s/\r$//;
 		$one_commit .= "<p>" if ($LOOSECOMMITS);
 		foreach my $logline (split(/\n/,$comment)) {
-#			writeoutputfile "<b>".HtmlEntities($logline)."</b><br>\n";
 			$one_commit .= "<b>".HtmlEntities($logline)."</b><br>\n";
 		}
 		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
@@ -2063,22 +2062,16 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 			}
 			my $state=$DateUserLogFileRevState{$dateuser}{$logcomment}{$filerevision};
 			$state =~ s/_forced//;
-#			writeoutputfile "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
 			$one_commit .= "* ".FormatCvsFileLink(ExcludeRepositoryFromPath($file,0,1),$version)." $version (".FormatState($state);
 			my $lines=$DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision};
-#			writeoutputfile ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
-#	    	writeoutputfile ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
-#			writeoutputfile ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
 			$one_commit .= ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
 			$one_commit .= ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
 			$one_commit .= ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
             if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
                 if ($state eq 'changed') {
-#			        writeoutputfile ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
-				$one_commit .= ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file),$version);
+    				$one_commit .= ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file,0,1),$version);
 			    }
             }
-#			writeoutputfile ")<br>\n";
 			$one_commit .= ")<br>\n";
 		}
     	$one_commit .= "</p>" if ($LOOSECOMMITS);
