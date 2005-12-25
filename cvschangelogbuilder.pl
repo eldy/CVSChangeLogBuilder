@@ -13,7 +13,7 @@ use Time::Local;
 # Defines
 #-------------------------------------------------------
 my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
-my $VERSION="2.2 (build $REVISION)";
+my $VERSION="2.3 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd $Since /;
