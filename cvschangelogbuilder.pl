@@ -1127,7 +1127,7 @@ while (<RLOGFILE>) {
 		if ($line =~ /$EXTRACTFILEDATEUSERSTATE/i) {
 			# We found date/user line
 			# Date can be "2005/12/31 23:59:59", "2005-12-31 23:59:59" ...
-			$filedate=$1; $fileuser=$2; $filestate=$3; $filechange=$4;
+			$filedate=$1; $fileuser=lc($2); $filestate=$3; $filechange=$4;
 			$filedate =~ s/\///g;
 			$filedate =~ s/-//g;
 			$filelineadd=0; $filelinedel=0; $filelinechange=0;
