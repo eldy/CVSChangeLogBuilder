@@ -8,6 +8,7 @@ $Revision$ - $Author$ - $Date$
 - Fix: The user is not case sensitive.
 - Fix: cvschangelogbuilder died for some CVS root in Windows.
 - Fix: Support module that contains spaces on it.
+- Fix: [ 1281761 ] diff link error.
 - New: Added -only option (for report on only files that match a regex).
 - More precise error message when writing png files.
 - Updated documentation.
