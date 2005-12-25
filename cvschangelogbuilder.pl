@@ -935,10 +935,10 @@ if (! $RLogFile) {
 	my $command;
 	#$command="$CVSCLIENT rlog ".($TagStart||$TagEnd?"-r$TagStart:$TagEnd ":"")."$Module";
 	if ($Branch) {
-		$command="$CVSCLIENT $COMP -d \"".$ENV{"CVSROOT"}."\" rlog -r${Branch} ".($Since? " -d'" . $Since . "' " : ""). "$Module";
+		$command="$CVSCLIENT $COMP -d \"" . $ENV{"CVSROOT"}."\" rlog -r${Branch} " . ($Since? " -d'" . $Since . "' " : "") . "\"$Module\"";
 	}
 	else {
-		$command="$CVSCLIENT $COMP -d \"".$ENV{"CVSROOT"}."\" rlog -b ".($Since? " -d'" . $Since . "' " : "").($TagStart||$TagEnd?" -r${TagStart}::${TagEnd}":"")." $Module";
+		$command="$CVSCLIENT $COMP -d \"" . $ENV{"CVSROOT"}."\" rlog -b " . ($Since? " -d'" . $Since . "' " : "") . ($TagStart||$TagEnd?"-r${TagStart}::${TagEnd} ":"") . "\"$Module\"";
 	}
 	writeoutput("Downloading temporary cvs rlog file '$TmpFile'\n",1);
 	writeoutput("with command '$command'\n",1);
