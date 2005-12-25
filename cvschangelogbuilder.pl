@@ -1669,7 +1669,7 @@ else {
 #    $graph->set_legend_font("");
 #    $graph->set(legend_placement=>'Right');
     my $gd = $graph->plot(\@data) or die $graph->error;
-    open(IMG, ">${OutputDir}$pngfile") or die "Error $!";
+    open(IMG, ">${OutputDir}${pngfile}") or die "Error building ${OutputDir}${pngfile}: $!";
     binmode IMG;
     print IMG $gd->png;
     close IMG;
