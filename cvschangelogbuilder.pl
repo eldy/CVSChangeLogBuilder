@@ -1708,11 +1708,11 @@ foreach my $developer (reverse sort { $nbcommit{$a} <=> $nbcommit{$b} } keys %nb
     writeoutputfile $nbcommit{$developer};
     writeoutputfile "</td><td>";
     writeoutputfile $nbfile{$developer};
-    writeoutputfile "</td><td>";
+    writeoutputfile "</td><td nowrap=\"1\">";
     writeoutputfile $UserChangeLineAdd{$developer}." / ".$UserChangeLineChange{$developer}." / ".$UserChangeLineDel{$developer};
-    writeoutputfile "</td><td>";
+    writeoutputfile "</td><td nowrap=\"1\">";
     writeoutputfile RoundNumber($UserChangeLineAdd{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineChange{$developer}/$nbcommit{$developer},1)." / ".RoundNumber($UserChangeLineDel{$developer}/$nbcommit{$developer},1);
-    writeoutputfile "</td><td>";
+    writeoutputfile "</td><td nowrap=\"1\">";
     writeoutputfile FormatDate($UserChangeLast{$developer},'simple');
     writeoutputfile "</td>";
     writeoutputfile "<td>&nbsp;</td>";
