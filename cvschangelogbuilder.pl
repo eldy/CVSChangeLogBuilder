@@ -756,7 +756,7 @@ if ($Help || ! $Output)
 	writeoutput("    nolastlogs        To remove last logs part\n");
 	writeoutput("    nolimit           To not limit last logs to last $MAXLASTLOG\n");
 	writeoutput("    sortbyrevision    To sort last logs by revision\n");
-	writeoutput("    includediff       To include the whole diff inside report page\n");
+	writeoutput("    includediff       To include diff inside report page (very slow)\n");
 	writeoutput("    loosecommits      To separate commits for same log by spaces\n");
 	writeoutput("\n");
 	writeoutput("The 'module' and 'repository' are the CVS module name and the CVS repository.\n");
