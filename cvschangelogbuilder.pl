@@ -6,6 +6,7 @@
 # $Revision$ - $Author$ - $Date$
 use strict; no strict "refs";
 use Time::Local;
+use CGI qw/:standard/;
 #use diagnostics;
 
 
@@ -24,7 +25,7 @@ my $PROG;
 my $Extension;
 my $Help='';
 my $Module='';
-my $ModuleForCache='';
+my $CacheNameForModule='';
 my $Output='';		# Default will be "listdeltabydate"
 my $OutputDir='';
 my $CvsRoot='';		# Example ":ntserver:127.0.0.1:d:/temp/cvs"
@@ -99,6 +100,7 @@ my $MAXLASTLOG=200;
 my $SORTBYREVISION=0;
 my $LOOSECOMMITS=0;
 my $NOSUMMARY=0;
+my $INCLUDEDIFF=0;
 my $NOLINESOFCODE=0;
 my $NODEVELOPERS=0;
 my $NODAYSOFWEEK=0;
@@ -210,8 +212,12 @@ sub writeoutputfile {
 
 #-------------------------------------------------------
 # LoadDataInMemory
-# Load cache entries in Hash
-# $fileformat - $filename - $filerevision - $filedate - $fileuser - $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange => $filestate
+# Desc: Load data in data hashes (DataUser, ...)
+# Input global var:
+# $fullfilename - $filelog - $fileformat - $filename - $filerevision - $filedate - $fileuser
+# $filestate - $filelineadd - $filelinechange - $filelinedel - $filechange
+# Global var that can be modified:
+# $filestate ...
 #-------------------------------------------------------
 sub LoadDataInMemory {
 
@@ -623,10 +629,11 @@ sub CompareVersionBis {
 #------------------------------------------------------------------------------
 sub DecreaseVersion {
 	my $a=shift;
-	my $aint; my $adec;
-	if ($a =~ /^(\d+)\.(\d+)$/) { $aint=int($1); $adec=int($2); } else { $aint=int($a); $adec=0; }
-    $adec--;
-	return "$aint.$adec";
+	if ($a =~ /^(\d+)\.(\d+)$/ && $2 > 0) {
+	    return "$1.".(int($2) - 1);
+	}
+	
+	return $a; # can't automatically decrease
 }
 
 #------------------------------------------------------------------------------
@@ -640,9 +647,9 @@ sub ExcludeRepositoryFromPath {
 	my $removemodule=shift;
 	if (! $keepattic) { $file =~ s/[\\\/]Attic([\\\/][^\\\/]+)/$1/; }
 	if ($removemodule) {
-		$file =~ s/^$ModuleForCache\@//;											# Remove Module name
+		$file =~ s/^$CacheNameForModule\@//;											# Remove Module name
 	}
-	$file =~ s/^($ModuleForCache\@)(\w:)?$RepositoryPath[\\\/]$Module[\\\/]/$1/;	# Remove path repository
+	$file =~ s/^($CacheNameForModule\@)(\w:)?$RepositoryPath[\\\/]$Module[\\\/]/$1/;	# Remove path repository
 	$file =~ s/^(\w:)?$RepositoryPath[\\\/]$Module[\\\/]//;
 	return $file;
 }
@@ -671,6 +678,10 @@ sub DayOfWeek {
 #-------------------------------------------------------
 # MAIN
 #-------------------------------------------------------
+
+# GET PARAMETERS
+#---------------
+
 my $QueryString=join(' ', @ARGV);
 if ($QueryString =~ /debug=(\d+)/i)    			{ $Debug=$1; }
 if ($QueryString =~ /m(?:odule|)=([^\s]+)/i)	{ $Module=$1; }
@@ -707,37 +718,12 @@ if (! $ENV{"SERVER_NAME"}) {
 	$REPRACINE=$ENV{"DOCUMENT_ROOT"};
 }
 
-my %param=();
-if ($Output) {
-    if ($Output =~ s/:(.*)//g) {
-        # There is some parameters on output option
-        foreach my $key (split(/,/,$1)) { $param{$key}=1; }
-        if ($param{'nolimit'}) { $MAXLASTLOG=0; }
-        if ($param{'sortbyrevision'}) { $SORTBYREVISION=1; }
-        if ($param{'loosecommits'}) { $LOOSECOMMITS=1; }
-        if ($param{'nosummary'}) { $NOSUMMARY=1; }
-        if ($param{'nolinesofcode'}) { $NOLINESOFCODE=1; }
-        if ($param{'nodevelopers'}) { $NODEVELOPERS=1; }
-        if ($param{'nodaysofweek'}) { $NODAYSOFWEEK=1; }
-        if ($param{'nohours'}) { $NOHOURS=1; }
-        if ($param{'notags'}) { $NOTAGS=1; }
-        if ($param{'nolastlogs'}) { $NOLASTLOGS=1; }
-    }
-	my %allowedvalueforoutput=(
-	"listdeltabydate"=>1,
-	"listdeltabylog"=>1,
-	"listdeltabyfile"=>1,
-	"listdeltaforrpm"=>1,
-	"buildhtmlreport"=>1
-	);
-	if (! $allowedvalueforoutput{$Output}) {
-		writeoutput("----- $PROG $VERSION (c) Laurent Destailleur -----\n");
-		writeoutput("Unknown value for output parameter.\n");
-		exit 1;
-	}
-}
 
-if ($Help || ! $Output) {
+# CHECK INPUT PARAMETERS VALIDITY
+#--------------------------------
+
+if ($Help || ! $Output)
+{
 	writeoutput("----- $PROG $VERSION (c) Laurent Destailleur -----\n");
 	writeoutput("$PROG generates advanced ChangeLog/Report files for CVS projects/modules.\n");
 	writeoutput("Note 1: Your cvs client (cvs or cvs.exe) must be in your PATH.\n");
@@ -770,6 +756,7 @@ if ($Help || ! $Output) {
 	writeoutput("    nolastlogs        To remove last logs part\n");
 	writeoutput("    nolimit           To not limit last logs to last $MAXLASTLOG\n");
 	writeoutput("    sortbyrevision    To sort last logs by revision\n");
+	writeoutput("    includediff       To include the whole diff inside report page\n");
 	writeoutput("    loosecommits      To separate commits for same log by spaces\n");
 	writeoutput("\n");
 	writeoutput("The 'module' and 'repository' are the CVS module name and the CVS repository.\n");
@@ -810,6 +797,41 @@ if ($Help || ! $Output) {
 	exit 0;
 }
 
+if ($Output)
+{
+    if ($Output =~ s/:(.*)//g)
+    {
+        # There is some parameters on output option
+		my %param=();
+        foreach my $key (split(/,/,$1)) { $param{$key}=1; }
+        if ($param{'nolimit'}) { $MAXLASTLOG=0; }
+        if ($param{'sortbyrevision'}) { $SORTBYREVISION=1; }
+        if ($param{'loosecommits'}) { $LOOSECOMMITS=1; }
+        if ($param{'nosummary'}) { $NOSUMMARY=1; }
+        if ($param{'includediff'}) { $INCLUDEDIFF=1; }
+        if ($param{'nolinesofcode'}) { $NOLINESOFCODE=1; }
+        if ($param{'nodevelopers'}) { $NODEVELOPERS=1; }
+        if ($param{'nodaysofweek'}) { $NODAYSOFWEEK=1; }
+        if ($param{'nohours'}) { $NOHOURS=1; }
+        if ($param{'notags'}) { $NOTAGS=1; }
+        if ($param{'nolastlogs'}) { $NOLASTLOGS=1; }
+    }
+	my %allowedvalueforoutput=(
+	"listdeltabydate"=>1,
+	"listdeltabylog"=>1,
+	"listdeltabyfile"=>1,
+	"listdeltaforrpm"=>1,
+	"buildhtmlreport"=>1
+	);
+	if (! $allowedvalueforoutput{$Output}) {
+		writeoutput("----- $PROG $VERSION (c) Laurent Destailleur -----\n");
+		writeoutput("Unknown value for output parameter.\n");
+		exit 1;
+	}
+}
+
+
+
 # Get current time
 my $nowtime=time();
 my ($nowsec,$nowmin,$nowhour,$nowday,$nowmonth,$nowyear) = localtime($nowtime);
@@ -835,7 +857,7 @@ my $timetomorrow=$tomorrowyear.$tomorrowmonth.$tomorrowday.$tomorrowhour.$tomorr
 # -- Start for module
 
 
-# Check/Retreive module
+# Check/Retrieve module name
 my $ModuleChoosed=$Module;
 if (! $Module || $Output =~ /^buildhtmlreport/) {
     $Module='';
@@ -864,19 +886,21 @@ if (! $Module) {
 
 writeoutput(ucfirst($PROG)." launched for module: $Module\n",1);
 
-# Define ModuleForCache (use for cache file and fullfilename)
-$ModuleForCache=$Module;
-$ModuleForCache =~ s/[\/\\\s]/_/g; # In case $Module contains '/','\',' '
+# Define CacheNameForModule (use for cache file and fullfilename)
+$CacheNameForModule=$Module;
+$CacheNameForModule =~ s/[\/\\\s]/_/g; # In case $Module contains '/','\',' '
 
-
-# Check/Retreive CVSROOT environment variable (needed to get $RepositoryPath)
+# Check/Retrieve CVSROOT environment variable (needed to get $RepositoryPath)
 my $CvsRootChoosed=$CvsRoot;
-if (! $CvsRoot || $Output =~ /^buildhtmlreport/) {
+if (! $CvsRoot || $Output =~ /^buildhtmlreport/)
+{
     $CvsRoot='';
 	# Try to get CvsRoot from CVS repository
-	if (-s "CVS/Root") {
+	if (-s "CVS/Root")
+	{
 		open(REPOSITORY,"<CVS/Root") || error("Failed to open 'CVS/Root' file to get repository value.");
-		while (<REPOSITORY>) {
+		while (<REPOSITORY>)
+		{
 			chomp $_; s/\r$//;
 			$CvsRoot=$_;
 			last;
@@ -904,6 +928,17 @@ if ($OutputDir) {
     $OutputDir.="/";
 }
 
+# Set use of ssh or not
+if ($UseSsh)
+{
+	writeoutput("Set CVS_RSH=ssh\n",1);
+	$ENV{'CVS_RSH'}='ssh';
+}
+
+
+# SUMMARY OF PARAMETERS
+#------------------------------------------
+
 $ENV{"CVSROOT"}=$CvsRoot;
 writeoutput(ucfirst($PROG)." launched for CVSRoot: $CvsRoot\n",1);
 
@@ -913,14 +948,7 @@ $RepositoryPath=quotemeta($RepositoryPath);
 
 writeoutput(ucfirst($PROG)." launched for Branch: ".($Branch?"$Branch":"HEAD")."\n",1);
 
-# Set use of ssh or not
-if ($UseSsh) {
-	writeoutput("Set CVS_RSH=ssh\n",1);
-	$ENV{'CVS_RSH'}='ssh';
-}
 
-# SUMMARY OF PARAMETERS
-#------------------------------------------
 
 # LAUNCH CVS COMMAND RLOG TO WRITE RLOGFILE
 #------------------------------------------
@@ -931,7 +959,7 @@ if (! $RLogFile) {
 	$TmpDir||=$ENV{"TMP"};
 	$TmpDir||=$ENV{"TEMP"};
 	$TmpDir||='/tmp';
-	my $TmpFile="$TmpDir/$PROG.$ModuleForCache.$$.tmp";
+	my $TmpFile="$TmpDir/$PROG.$CacheNameForModule.$$.tmp";
 	open(TEMPFILE,">$TmpFile") || error("Failed to open temp file '$TmpFile' for writing. Check directory and permissions.");
 	my $command;
 	if ($Branch) {
@@ -952,12 +980,14 @@ if (! $RLogFile) {
 	$RLogFile=$TmpFile;
 }
 
-# ANALYZE RLOGFILE
-#------------------------
-writeoutput("Analyzing rlog file '$RLogFile'\n",1);
-if ($Output =~ /^buildhtmlreport/) {
+
+# LOAD CACHE OF NBOFLINES FOR EACH FILE/REVISION
+#----------------------------------------------------
+my $cachefile="${OutputDir}${PROG}_${CacheNameForModule}.cache";
+if ($Output =~ /^buildhtmlreport/)
+{
     # Try to read cache file
-    my $cachefile="${OutputDir}${PROG}_${ModuleForCache}.cache";
+    # Cache file format are records: "file revision nboflines bin/ascii"
     debug(" Search for cache file '$cachefile' into current directory",1);
     if (-f $cachefile) {
         writeoutput("Load cache file '$cachefile' with number of lines for added files...\n",1);
@@ -976,13 +1006,21 @@ if ($Output =~ /^buildhtmlreport/) {
         print STDERR "time (between several seconds to hours depending on your CVS server response\n";
         print STDERR "time), so please wait...\n";
     }
+}
+
+
+# ANALYZE RLOGFILE AND UPDATE CACHE FILE
+#---------------------------------------
+writeoutput("Analyzing rlog file '$RLogFile'\n",1);
+open(RLOGFILE,"<$RLogFile") || error("Can't open rlog file");
+if ($Output =~ /^buildhtmlreport/)
+{
     # Open cache file to write new files entries
     open(CACHE,">>$cachefile") || error("Failed to open cache file '$cachefile' for writing");
 }
-
-open(RLOGFILE,"<$RLogFile") || error("Can't open rlog file");
 my $waitfor="filename";
-while (<RLOGFILE>) {
+while (<RLOGFILE>)
+{
 	chomp $_; s/\r$//;
 	my $line="$_";
 
@@ -1042,10 +1080,11 @@ while (<RLOGFILE>) {
     #if ($line =~ /^cvs rlog: Logging (.*)/) { $Module=$1; } # Set module name from log file
 
 	# New file found (even if not expected)
-	if ($line =~ /$EXTRACTFILENAME/i) {
+	if ($line =~ /$EXTRACTFILENAME/i)
+	{
 		$filename="$1";
 		$filename =~ s/,v$//;					# Clean filename if ended with ",v"
-		$fullfilename="$ModuleForCache\@$filename";
+		$fullfilename="$CacheNameForModule\@$filename";
 		my $truefilename=ExcludeRepositoryFromPath("$filename",0,1);
 		# We found a new filename
 		debug("Found a new file '$fullfilename', '$truefilename'",2);
@@ -1154,10 +1193,11 @@ while (<RLOGFILE>) {
 		next;
 	}
 }
-close RLOGFILE;
 if ($Output =~ /^buildhtmlreport/) {
     close CACHE;
 }
+close RLOGFILE;
+
 
 # Build %tagsshortdate
 #---------------------
@@ -1168,9 +1208,10 @@ foreach my $tag (keys %tagsshortdate) {
 	debug("Add entry in tagstags for key $tagsshortdate{$tag} with value $tag",2);
 }
 
+
 # BUILD OUTPUT
 #------------------------
-my $OutputRootFile="${PROG}_".($Branch?"(${Branch})_${ModuleForCache}":"${ModuleForCache}");
+my $OutputRootFile="${PROG}_".($Branch?"(${Branch})_${CacheNameForModule}":"${CacheNameForModule}");
 
 # Start of true output
 if ($OutputDir) {
@@ -1246,6 +1287,9 @@ a:visited { color: #0011BB; text-decoration: none; }
 a:hover   { color: #605040; text-decoration: underline; }
 div { font: 12px 'Arial','Verdana','Helvetica', sans-serif; text-align: justify; }
 .CTooltip { position:absolute; top: 0px; left: 0px; z-index: 2; width: 380px; visibility:hidden; font: 8pt 'MS Comic Sans','Arial',sans-serif; background-color: #FFFFE6; padding: 8px; border: 1px solid black; }
+.code { border-left: medium solid black; display: none; padding-left: 0.5em; }
+.added { background-color: #44ff44; }
+.removed { background-color: #ff4444; }
 //-->
 </style>
 EOF
@@ -2044,7 +2088,8 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 		foreach my $logline (split(/\n/,$comment)) {
 			$one_commit .= "<b>".HtmlEntities($logline)."</b><br>\n";
 		}
-		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}}) {
+		foreach my $filerevision (reverse sort keys %{$DateUserLogFileRevState{$dateuser}{$logcomment}})
+		{
 			$filerevision=~/(.*)\s([\d\.]+)/;
 			my ($file,$version)=($1,$2);
 #			if ($maxincludedver{"$file"} && (CompareVersionBis($2,$maxincludedver{"$file"}) > 0)) { debug("For file '$file' $2 > maxincludedversion= ".$maxincludedver{"$file"},3); next; }
@@ -2067,11 +2112,47 @@ foreach my $dateuser (reverse sort keys %DateUser) {
 			$one_commit .= ($state eq 'added' && $lines?" <font color=\"#008822\">$lines</font>":"");
 			$one_commit .= ($state eq 'changed' && $lines?" <font color=\"#888888\">$lines</font>":"");
 			$one_commit .= ($state eq 'removed' && $lines?" <font color=\"#880000\">$lines</font>":"");
-            if ($ViewCvsUrl && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/) {
-                if ($state eq 'changed') {
+            if ($state eq 'changed' && $DateUserLogFileRevLine{$dateuser}{$logcomment}{$filerevision} !~ /binary/)
+		 	{
+            	if ($ViewCvsUrl)
+	            {
     				$one_commit .= ", ".FormatCvsDiffLink(ExcludeRepositoryFromPath($file,0,1),$version);
 			    }
-            }
+				if ($INCLUDEDIFF && CompareVersionBis($version,1.1) > 0)
+				{
+					my $relfile=ExcludeRepositoryFromPath($file,0,1);
+					my $command="$CVSCLIENT $COMP -d ".$ENV{"CVSROOT"}.
+					" diff -u -r ".DecreaseVersion($version)." -r $version $relfile";
+					my $result=`$command 2>&1`;
+					
+					$one_commit .= " <a href='#$relfile-$version' \
+					onclick=\"document.getElementById('$relfile-$version').style.display = 'block'\">Show Changes</a>";
+					$one_commit .= "<pre id='$relfile-$version' class='code'><a href='#$relfile-$version' onclick=\"document.getElementById('$relfile-$version').style.display='none'\">Hide Changes</a><br />";
+					foreach my $line (split /\n/,$result)
+					{
+						if ($line =~ /^Index:/) { next; }
+						if ($line =~ /^======/) { next; }
+						if ($line =~ /^RCS file:/) { next; }
+						if ($line =~ /^retrieving revision/) { next; }
+						if ($line =~ /^diff/) { next; }
+						if ($line =~ /^---/) { next; }
+						if ($line =~ /^\+\+\+/) { next; }
+						
+						my $type = substr($line,0,1);
+						if ($type eq '+') {
+						    $one_commit .= "<span class='added'>";
+						} elsif ($type eq '-') {
+						    $one_commit .= "<span class='removed'>";
+						}
+						$one_commit .= escapeHTML($line) . "\n";
+						if ($type eq '+' || $type eq '-')
+						{
+						    $one_commit .= "</span>";
+						}
+					}
+					$one_commit .= "</pre>";
+				}
+			} 	
 			$one_commit .= ")<br>\n";
 		}
     	$one_commit .= "</p>" if ($LOOSECOMMITS);
