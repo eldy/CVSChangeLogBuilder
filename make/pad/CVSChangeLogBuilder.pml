@@ -5,8 +5,8 @@
 	<Program_Info>
 		<Program_Name>CVSChangeLogBuilder</Program_Name>
 		<Program_Version>2.3</Program_Version>
-		<Program_Release_Month>07</Program_Release_Month>
-		<Program_Release_Day>25</Program_Release_Day>
+		<Program_Release_Month>12</Program_Release_Month>
+		<Program_Release_Day>23</Program_Release_Day>
 		<Program_Release_Year>2006</Program_Release_Year>
 		<Program_Cost_Dollars />
 		<Program_Cost_Other_Code />
@@ -70,7 +70,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		</Application_URLs>
 		<Download_URLs>
 			<Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tar.gz</Primary_Download_URL>
-			<Secondary_Download_URL>http://prdownloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-2.3.tar.gz</Secondary_Download_URL>
+			<Secondary_Download_URL>http://downloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-2.3.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
