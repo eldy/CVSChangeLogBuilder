@@ -545,7 +545,7 @@ sub FormatCvsFileLink {
         $string =~ s/__MODULE__/$Module/g;
         $url =~ s/$Module\@//g;
         $string.="$url";
-        $string.="?rev=".$version;
+        $string.="?view=markup&rev=".$version;
     	return "<a href=\"$string\" target=\"_newcvs\">$url</a>";
 	}
 	else {
