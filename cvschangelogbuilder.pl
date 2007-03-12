@@ -229,6 +229,17 @@ sub LoadDataInMemory {
 	$filelog =~ s/^\s*[\r\n]*//g;				# Remove starting blank
 	my $newfilelog=ucfirst("$filelog");
 
+	# If log start with "file .cvsignore was initially added on branch xxx"
+	# It is an add in branch xxx
+	if ($filelog =~ /file (.*) was initially added on branch (.*)/i)
+	{
+		if (! $Branch || (uc($Branch) != uc($2)))
+		{
+			debug(" Entry discarded because in branch $2",2);
+			return;
+		}
+	}
+	
 	# DEFINE CHANGE STATUS (removed, changed or added) OF FILE
 	my $newfilestate='';
 	if ($Output =~ /^listdelta/ || $Output =~ /^buildhtmlreport/) {
@@ -707,6 +718,7 @@ debug("Parameter OutputDir    : $OutputDir");
 debug("Parameter Branch       : $Branch");
 debug("Parameter ViewCvsUrl   : $ViewCvsUrl");
 debug("Parameter Since        : $Since");
+debug("Parameter Debug        : $Debug");
 debug("Parameter IgnoreFileDir: ".join(',',keys %IgnoreFileDir));
 if ($ViewCvsUrl && $ViewCvsUrl !~ /\/$/) { $ViewCvsUrl.="/"; }
 
