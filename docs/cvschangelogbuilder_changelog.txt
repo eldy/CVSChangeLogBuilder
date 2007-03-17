@@ -2,6 +2,11 @@ CVSChangelogBuilder Changelog
 -----------------------------
 $Revision$ - $Author$ - $Date$
 
+2.4
+
+- Fix: Link on php files does not works
+- Fix: Exclude files if they are result of add in another branch.
+
 
 2.3
 
