@@ -18,7 +18,7 @@ listdeltabyfile	    To build a changelog by file.
 listdeltabylog      To build a changelog by change comment.
 buildhtmlreport     To build an html report of project CVS activity.
 
-License: GNU GPL (GNU General Public License. See LICENSE file)
+License: GNU GPL (GNU General Public License. See COPYING.TXT file)
 Version : 2.3
 Release date: December 2006
 Platforms: All (Linux, NT, BSD, Solaris and other *NIX's, BeOS, OS/2...)
