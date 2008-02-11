@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <PADGEN_PML>
-	<AppVerInfo>PADGen 2.0.2.30</AppVerInfo>
+	<AppVerInfo>PADGen 3.0.1.35</AppVerInfo>
 	<CompanyName />
 	<Program_Info>
 		<Program_Name>CVSChangeLogBuilder</Program_Name>
@@ -65,7 +65,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 			<Application_Info_URL>http://cvschangelogb.sourceforge.net</Application_Info_URL>
 			<Application_Order_URL>http://cvschangelogb.sourceforge.net</Application_Order_URL>
 			<Application_Screenshot_URL>http://cvschangelogb.sourceforge.net/docs/images/screen_shot_1.jpg</Application_Screenshot_URL>
-			<Application_Icon_URL>http://cvschangelogb.sourceforge.net/docs/images/cvschangelogbuilder_logo1.gif</Application_Icon_URL>
+			<Application_Icon_URL>http://cvschangelogb.sourceforge.net/docs/images/cvschangelogbuilder.gif</Application_Icon_URL>
 			<Application_XML_File_URL>http://cvschangelogb.sourceforge.net/docs/pad_cvschangelogbuilder.xml</Application_XML_File_URL>
 		</Application_URLs>
 		<Download_URLs>
