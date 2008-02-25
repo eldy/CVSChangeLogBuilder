@@ -4,7 +4,8 @@
 - Build PAD files
 - Tag CVS sources
 
-- makepack.pl
+- makepack-cvschangelogbuilder.pl (If on linux copy cvschangelogbuilder_logo1.gif into $RPMDIR/SOURCES)
+
 - Move files in files
 - Upload files
 - Send mail on mailing list
