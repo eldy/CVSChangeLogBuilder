@@ -24,6 +24,8 @@ my $DIR;
 my $PROG;
 my $Extension;
 my $Help='';
+my $AllowIndex=0;
+my $IncludeHeader='';
 my $Module='';
 my $CacheNameForModule='';
 my $Output='';		# Default will be "listdeltabydate"
@@ -710,6 +712,8 @@ if ($QueryString =~ /-d=([^\s]+)/)      		{ $CvsRoot=$1; }
 if ($QueryString =~ /-h/)      					{ $Help=1; }
 if ($QueryString =~ /-ignore=([^\s]+)/i)        { map { $IgnoreFileDir{quotemeta($_)}=1; } split(',',$1); }
 if ($QueryString =~ /-only=([^\s]+)/i)        	{ $OnlyFileDir{$1}=1; }
+if ($QueryString =~ /-allowindex/i) 		  	{ $AllowIndex=1; }
+if ($QueryString =~ /-includeheader=([^\s]+)/i) { $IncludeHeader=$1; }
 ($DIR=$0) =~ s/([^\/\\]+)$//; ($PROG=$1) =~ s/\.([^\.]*)$//; $Extension=$1;
 $DIR||='.'; $DIR =~ s/([^\/\\])[\\\/]+$/$1/;
 debug("Parameter Module       : $Module");
@@ -798,7 +802,9 @@ if ($Help || ! $Output)
 	writeoutput("                           will be replaced by name of CVS module.\n");
 	writeoutput("  -ignore=file/dir    To exclude a file/dir off report.\n");
 	writeoutput("  -only=file/dir      To have reports only on file/dir that match.\n");
-	writeoutput("  -debug=x            To output on stderr some debug info with level x\n");
+	writeoutput("  -includeheader=file To add content of a file after body tag.\n");
+	writeoutput("  -allowindex         To allow meta tag index (noindex by default).\n");
+	writeoutput("  -debug=x            To output on stderr some debug info with level x.\n");
 	writeoutput("\n");
 	writeoutput("Examples:\n");
 	writeoutput("  $PROG.$Extension -output=listdeltabyfile -module=myproject -tagstart=myproj_2_0 -d=john\@cvsserver:/cvsdir\n");
@@ -1269,10 +1275,10 @@ if ($Output !~ /buildhtmlreport$/) {
 else {
     writeoutputfile "<html>\n<head>\n";
     writeoutputfile "<meta name=\"generator\" content=\"$PROG $VERSION\" />\n";
-    writeoutputfile "<meta name=\"robots\" content=\"noindex,nofollow\" />\n";
+    writeoutputfile "<meta name=\"robots\" content=\"".($AllowIndex?"":"no")."index,".($AllowIndex?"":"no")."follow\" />\n";
     writeoutputfile "<meta http-equiv=\"content-type\" content=\"text/html; charset=iso-8859-1\" />\n";
-    writeoutputfile "<meta http-equiv=\"description\" content=\"$headstring\" />\n";
-    writeoutputfile "<title>CVS report for $Module</title>\n";
+    writeoutputfile "<meta http-equiv=\"description\" content=\"CVS Report for development activity on module $Module - Built by CVSChangeLogBuilder\" />\n";
+    writeoutputfile "<title>CVS report for activity on module $Module</title>\n";
     writeoutputfile <<EOF;
 <style type="text/css">
 <!--
@@ -1307,6 +1313,15 @@ div { font: 12px 'Arial','Verdana','Helvetica', sans-serif; text-align: justify;
 EOF
     writeoutputfile "</head>\n";
     writeoutputfile "<body>\n";
+	if ($IncludeHeader)
+	{
+		open(INCLUDE,"<$IncludeHeader") || die "Failed to open includeheader $IncludeHeader file";
+		my $line='';
+		while ($line=<INCLUDE>) {
+			writeoutputfile $line;
+		}
+        close(INCLUDE);		
+	}
 }
 
 # For output by date
