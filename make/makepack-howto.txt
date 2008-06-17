@@ -6,6 +6,9 @@
 
 - makepack-cvschangelogbuilder.pl (If on linux copy cvschangelogbuilder_logo1.gif into $RPMDIR/SOURCES)
 
-- Move files in files
-- Upload files
+- Check content of built packages.
+- Move build files into "files" directory
+- Update web site page index.php
+- Upload files and web site on web server
+- Upload files on sourceforge
 - Send mail on mailing list
