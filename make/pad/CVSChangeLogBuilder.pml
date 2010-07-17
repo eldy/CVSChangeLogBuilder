@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <PADGEN_PML>
-	<AppVerInfo>PADGen 3.0.1.37</AppVerInfo>
+	<AppVerInfo>PADGen 3.1.0.41</AppVerInfo>
 	<CompanyName />
 	<Program_Info>
 		<Program_Name>CVSChangeLogBuilder</Program_Name>
@@ -14,7 +14,7 @@
 		<Program_Type>Freeware</Program_Type>
 		<Program_Release_Status>Minor Update</Program_Release_Status>
 		<Program_Install_Support>No Install Support</Program_Install_Support>
-		<Program_OS_Support>Win95,Win98,WinME,WinNT 4.x,Windows2000,WinXP,Unix,Linux,OS/2,OS/2 Warp,OS/2 Warp 4,MAC 68k,Mac PPC</Program_OS_Support>
+		<Program_OS_Support>Linux,Mac Other,Unix,Win2000,Win7 x32,Win7 x64,Win98,WinOther,WinServer,WinVista,WinVista x64,WinXP,Other</Program_OS_Support>
 		<Program_Language>English</Program_Language>
 		<Program_Change_Info />
 		<Program_Specific_Category>Development Tools</Program_Specific_Category>
@@ -37,7 +37,7 @@
 	</Program_Info>
 	<Program_Descriptions>
 		<English>
-			<Keywords>cvschangelogbuilder</Keywords>
+			<Keywords>cvschangelogbuilder, cvs, changelog</Keywords>
 			<Char_Desc_45>cvschangelogbuilder - Build CVS ChangeLog</Char_Desc_45>
 			<Char_Desc_80>cvschangelogbuilder - A friendly CVS ChangeLog builder (GPL)</Char_Desc_80>
 			<Char_Desc_250>cvschangelogbuilder - A friendly CVS ChangeLog builder (GPL)</Char_Desc_250>
@@ -51,14 +51,6 @@ listdeltabydate To build a changelog by date (looks near 'cvs log').
 listdeltabyfile To build a changelog by file.
 listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		</English>
-		<French>
-			<Keywords />
-			<Char_Desc_45 />
-			<Char_Desc_80 />
-			<Char_Desc_250 />
-			<Char_Desc_450 />
-			<Char_Desc_2000 />
-		</French>
 	</Program_Descriptions>
 	<Web_Info>
 		<Application_URLs>
@@ -79,11 +71,6 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		<Distribution_Permissions>GNU GPL</Distribution_Permissions>
 		<EULA>GNU GPL</EULA>
 	</Permissions>
-	<ASP>
-		<ASP_FORM>Y</ASP_FORM>
-		<ASP_Member>N</ASP_Member>
-		<ASP_Member_Number />
-	</ASP>
 	<Affiliates>
 		<Affiliates_FORM>Y</Affiliates_FORM>
 		<Affiliates_VERSION>1.4</Affiliates_VERSION>
@@ -190,4 +177,9 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		<Affiliates_Yaskifo_Product_ID />
 		<Affiliates_Yaskifo_Maximum_Commission_Rate />
 	</Affiliates>
+	<ASP>
+		<ASP_FORM>Y</ASP_FORM>
+		<ASP_Member>N</ASP_Member>
+		<ASP_Member_Number />
+	</ASP>
 </PADGEN_PML>
