@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <XML_DIZ_INFO>
 	<MASTER_PAD_VERSION_INFO>
-		<MASTER_PAD_VERSION>3.10</MASTER_PAD_VERSION>
-		<MASTER_PAD_EDITOR>PADGen 3.1.0.41 http://www.padgen.org</MASTER_PAD_EDITOR>
-		<MASTER_PAD_INFO>Portable Application Description, or PAD for short, is a data set that is used by shareware authors to disseminate information to anyone interested in their software products. To find out more go to http://www.asp-shareware.org/pad</MASTER_PAD_INFO>
+		<MASTER_PAD_VERSION>3.11</MASTER_PAD_VERSION>
+		<MASTER_PAD_EDITOR>PADGen 3.1.1.47 http://www.padgen.org</MASTER_PAD_EDITOR>
+		<MASTER_PAD_INFO>Portable Application Description, or PAD for short, is a data set that is used by shareware authors to disseminate information to anyone interested in their software products. To find out more go to http://pad.asp-software.org</MASTER_PAD_INFO>
 	</MASTER_PAD_VERSION_INFO>
 	<Company_Info>
 		<Company_Name>Laurent Destailleur</Company_Name>
@@ -34,10 +34,10 @@
 	</Company_Info>
 	<Program_Info>
 		<Program_Name>CVSChangeLogBuilder</Program_Name>
-		<Program_Version>2.4</Program_Version>
-		<Program_Release_Month>06</Program_Release_Month>
-		<Program_Release_Day>17</Program_Release_Day>
-		<Program_Release_Year>2008</Program_Release_Year>
+		<Program_Version>2.5</Program_Version>
+		<Program_Release_Month>08</Program_Release_Month>
+		<Program_Release_Day>21</Program_Release_Day>
+		<Program_Release_Year>2010</Program_Release_Year>
 		<Program_Cost_Dollars />
 		<Program_Cost_Other_Code />
 		<Program_Cost_Other />
@@ -51,9 +51,9 @@
 		<Program_Category_Class>Development::Other</Program_Category_Class>
 		<Program_System_Requirements>CVS</Program_System_Requirements>
 		<File_Info>
-			<File_Size_Bytes>128271</File_Size_Bytes>
-			<File_Size_K>125</File_Size_K>
-			<File_Size_MB>0.12</File_Size_MB>
+			<File_Size_Bytes>65656</File_Size_Bytes>
+			<File_Size_K>64</File_Size_K>
+			<File_Size_MB>0.06</File_Size_MB>
 		</File_Info>
 		<Expire_Info>
 			<Has_Expire_Info>N</Has_Expire_Info>
@@ -81,6 +81,14 @@ listdeltabydate To build a changelog by date (looks near 'cvs log').
 listdeltabyfile To build a changelog by file.
 listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		</English>
+		<French>
+			<Keywords />
+			<Char_Desc_45 />
+			<Char_Desc_80 />
+			<Char_Desc_250 />
+			<Char_Desc_450 />
+			<Char_Desc_2000 />
+		</French>
 	</Program_Descriptions>
 	<Web_Info>
 		<Application_URLs>
@@ -92,7 +100,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		</Application_URLs>
 		<Download_URLs>
 			<Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tar.gz</Primary_Download_URL>
-			<Secondary_Download_URL>http://downloads.sourceforge.net/cvschangelogb/cvschangelogbuilder-2.4.tar.gz</Secondary_Download_URL>
+			<Secondary_Download_URL>http://downloads.sourceforge.net/cvschangelogb/cvschangelogbuilder-2.5.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
@@ -104,7 +112,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 	<Affiliates>
 		<Affiliates_FORM>Y</Affiliates_FORM>
 		<Affiliates_VERSION>1.4</Affiliates_VERSION>
-		<Affiliates_URL>http://www.asp-shareware.org/pad/extensions/Affiliates.htm</Affiliates_URL>
+		<Affiliates_URL>http://pad.asp-software.org/extensions/Affiliates.htm</Affiliates_URL>
 		<Affiliates_Information_Page />
 		<Affiliates_Avangate_Order_Page />
 		<Affiliates_Avangate_Vendor_ID />

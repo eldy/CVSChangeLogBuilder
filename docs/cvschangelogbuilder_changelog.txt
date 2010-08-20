@@ -2,6 +2,11 @@ CVSChangelogBuilder Changelog
 -----------------------------
 $Revision$ - $Author$ - $Date$
 
+2.5
+
+- Fix: Only minor fixes.
+
+
 2.4
 
 - Fix: Link on php files does not works.
