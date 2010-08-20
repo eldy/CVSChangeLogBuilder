@@ -92,7 +92,7 @@ listdeltabylog To build a changelog by change comment.</Char_Desc_2000>
 		</Application_URLs>
 		<Download_URLs>
 			<Primary_Download_URL>http://cvschangelogb.sourceforge.net/files/cvschangelogbuilder.tar.gz</Primary_Download_URL>
-			<Secondary_Download_URL>http://downloads.sourceforge.net/cvschangelogbuilder/cvschangelogbuilder-2.4.tar.gz</Secondary_Download_URL>
+			<Secondary_Download_URL>http://downloads.sourceforge.net/cvschangelogb/cvschangelogbuilder-2.4.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
