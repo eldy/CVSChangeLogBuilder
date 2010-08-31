@@ -1,6 +1,6 @@
 
-------------- AWBot --------------
-         cvschangelogbuilder
+--------CvsChangelogbuilder--------
+       CVS ChangeLog Builder
 ----------------------------------
 
 cvschangelogbuilder is an utility to generate a changelog for a project

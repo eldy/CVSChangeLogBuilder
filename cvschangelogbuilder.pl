@@ -14,7 +14,7 @@ use CGI qw/:standard/;
 # Defines
 #-------------------------------------------------------
 my $REVISION='$Revision$'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
-my $VERSION="2.4 (build $REVISION)";
+my $VERSION="2.5 (build $REVISION)";
 
 # ---------- Init variables --------
 use vars qw/ $TagStart $Branch $TagEnd $Since /;
@@ -704,7 +704,7 @@ if ($QueryString =~ /since=([^\s]+)/i) 		{ $Since=$1; }
 if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
-if ($QueryString =~ /rlogfile=([:\-\.\\\/\wè~]+)/i) { $RLogFile=$1; }
+if ($QueryString =~ /rlogfile=([:\-\.\\\/\wï¿½~]+)/i) { $RLogFile=$1; }
 if ($QueryString =~ /keeprlogfile/i)            { $KeepRlogFile=1; }
 if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
