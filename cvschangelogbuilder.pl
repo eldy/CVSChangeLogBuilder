@@ -704,7 +704,7 @@ if ($QueryString =~ /since=([^\s]+)/i) 		{ $Since=$1; }
 if ($QueryString =~ /tagstart=([^\s]+)/i) 		{ $TagStart=$1; }
 if ($QueryString =~ /tagend=([^\s]+)/i)   		{ $TagEnd=$1; }
 if ($QueryString =~ /-ssh/)    					{ $UseSsh=1 }
-if ($QueryString =~ /rlogfile=([:\-\.\\\/\w�~]+)/i) { $RLogFile=$1; }
+if ($QueryString =~ /rlogfile=([:\-\.\\\/\w~]+)/i) { $RLogFile=$1; }
 if ($QueryString =~ /keeprlogfile/i)            { $KeepRlogFile=1; }
 if ($QueryString =~ /dir=([^\s]+)/i)    		{ $OutputDir=$1; }
 if ($QueryString =~ /viewcvsurl=([^\s]+)/i)  	{ $ViewCvsUrl=$1; }
@@ -1430,13 +1430,13 @@ if ($Output =~ /buildhtmlreport$/) {
 
     my ($errorstringlines,$errorstringpie,$errorstringbars)=();
     if (!eval ('require "GD/Graph/lines.pm";')) { 
-        $errorstringlines=($@?"Error: $@":"Error: Need Perl module GD::Graph::lines");
+        $errorstringlines=($@ ? "Error: $@" : "Error: Need Perl module GD::Graph::lines");
     }
     if (!eval ('require "GD/Graph/pie.pm";')) { 
-        $errorstringpie=($@?"Error: $@":"Error: Need Perl module GD::Graph::pie");
+        $errorstringpie=( $@ ? "Error: $@" : "Error: Need Perl module GD::Graph::pie");
     }
     if (!eval ('require "GD/Graph/bars.pm";')) { 
-        $errorstringbars=($@?"Error: $@":"Error: Need Perl module GD::Graph::bars");
+        $errorstringbars=($@ ? "Error: $@" : "Error: Need Perl module GD::Graph::bars");
     }
 
     my $color_user="#FFF0E0";
@@ -1659,7 +1659,7 @@ writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserMonth?"<b>".(scalar 
 writeoutputfile "<td width=\"180\">".(scalar keys %TotalUserDay?"<b>".(scalar keys %TotalUserDay)."</b>":"0")."</td>";
 writeoutputfile "</tr>\n";
 
-writeoutputfile "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\"></td>";
+writeoutputfile "<tr><td class=\"aws\">Number of commits</td><td bgcolor=\"$color_commit\">&nbsp;</td>";
 writeoutputfile "<td>".($TotalCommit?"<b>$TotalCommit</b>":"0")."</td>";
 writeoutputfile "<td>".($TotalCommitMonth?"<b>$TotalCommitMonth</b>":"0")."</td>";
 writeoutputfile "<td>".($TotalCommitDay?"<b>$TotalCommitDay</b>":"0")."</td>";
